@@ -1,0 +1,1706 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SnapLingo — UI 与布局重构设计预览</title>
+  <style>
+    :root {
+      --stage-bg: #e7ebf2;
+      --win-bg: #f6f7f9;
+      --sidebar-bg: #eceff4;
+      --surface: #ffffff;
+      --surface-subtle: #f3f5f8;
+      --surface-hover: #e9edf4;
+      --border: rgba(15, 23, 42, 0.085);
+      --border-strong: rgba(15, 23, 42, 0.16);
+      --ink: #0f172a;
+      --ink-2: #334155;
+      --muted: #64748b;
+      --faint: #94a3b8;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: rgba(37, 99, 235, 0.09);
+      --accent-ring: rgba(37, 99, 235, 0.25);
+      --good: #059669;
+      --good-soft: rgba(5, 150, 105, 0.11);
+      --warn: #d97706;
+      --warn-soft: rgba(217, 119, 6, 0.12);
+      --danger: #dc2626;
+      --danger-soft: rgba(220, 38, 38, 0.1);
+      --shadow-win: 0 28px 70px -15px rgba(15, 23, 42, 0.2), 0 0 0 1px rgba(15, 23, 42, 0.08);
+      --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.035);
+      --shadow-float: 0 20px 50px -12px rgba(15, 23, 42, 0.26), 0 0 0 1px rgba(15, 23, 42, 0.09);
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    }
+
+    [data-theme="dark"] {
+      --stage-bg: #0b0e14;
+      --win-bg: #121620;
+      --sidebar-bg: #0e121a;
+      --surface: #181e2c;
+      --surface-subtle: #141925;
+      --surface-hover: #21293b;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      --ink: #f1f5f9;
+      --ink-2: #cbd5e1;
+      --muted: #94a3b8;
+      --faint: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --accent-soft: rgba(59, 130, 246, 0.16);
+      --accent-ring: rgba(59, 130, 246, 0.34);
+      --good: #34d399;
+      --good-soft: rgba(52, 211, 153, 0.14);
+      --warn: #fbbf24;
+      --warn-soft: rgba(251, 191, 36, 0.14);
+      --danger: #f87171;
+      --danger-soft: rgba(248, 113, 113, 0.14);
+      --shadow-win: 0 30px 80px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.09);
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25);
+      --shadow-float: 0 24px 56px -12px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--stage-bg);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, select, textarea { font-family: inherit; color: inherit; }
+    button { cursor: pointer; border: none; background: none; }
+    .hidden { display: none !important; }
+
+    /* ── Top Preview Switcher ────────────────────────────────────── */
+    .preview-bar {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between; gap: 14px;
+      padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .preview-brand { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; }
+    .logo-mark {
+      width: 24px; height: 24px; border-radius: 6px;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff;
+      display: grid; place-items: center; font-weight: 700; font-size: 12px;
+    }
+    .scene-tabs {
+      display: flex; align-items: center; gap: 3px; padding: 3px;
+      border-radius: 10px; background: var(--surface-subtle); border: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .scene-tab {
+      padding: 6px 12px; border-radius: 7px; font-size: 12px; font-weight: 500;
+      color: var(--muted); white-space: nowrap; transition: all 0.15s ease;
+    }
+    .scene-tab:hover { color: var(--ink); }
+    .scene-tab.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .pill-btn {
+      display: inline-flex; align-items: center; gap: 6px; height: 31px; padding: 0 12px;
+      border-radius: 8px; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
+      transition: all 0.14s ease;
+    }
+    .pill-btn:hover { background: var(--surface-hover); color: var(--ink); }
+    .pill-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .pill-btn.primary:hover { background: var(--accent-hover); }
+    .pill-btn.danger { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
+
+    .stage {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 24px 20px 36px;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       1. SETTINGS WINDOW — V1 Clean Two-Column Style + Full Features
+       ══════════════════════════════════════════════════════════════ */
+    .settings-window {
+      width: 100%; max-width: 1040px; height: 700px;
+      background: var(--win-bg); border-radius: 14px;
+      box-shadow: var(--shadow-win); display: flex; overflow: hidden;
+    }
+
+    /* Clean Light Sidebar (V1 style) */
+    .sidebar {
+      width: 216px; flex-shrink: 0; background: var(--sidebar-bg);
+      border-right: 1px solid var(--border); display: flex; flex-direction: column;
+      padding: 14px 12px 12px;
+    }
+    .win-chrome { display: flex; align-items: center; gap: 7px; padding: 4px 6px 14px; }
+    .traffic-lights { display: flex; gap: 7px; }
+    .tl { width: 11px; height: 11px; border-radius: 50%; }
+    .tl.r { background: #ff5f57; } .tl.y { background: #febc2e; } .tl.g { background: #28c840; }
+
+    .app-brand-row { display: flex; align-items: center; gap: 10px; padding: 2px 8px 16px; }
+    .app-brand-logo {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff;
+      display: grid; place-items: center; font-weight: 700; font-size: 14px;
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+    }
+    .app-brand-title { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+    .app-brand-ver { font-size: 10.5px; color: var(--faint); font-weight: 500; }
+
+    .nav-group-label {
+      font-size: 10.5px; font-weight: 600; color: var(--faint);
+      padding: 10px 10px 5px; letter-spacing: 0.04em;
+    }
+    .nav-list { display: flex; flex-direction: column; gap: 2px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px; height: 35px; padding: 0 10px;
+      border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--ink-2);
+      transition: all 0.12s ease; text-align: left;
+    }
+    .nav-item:hover { background: var(--surface-hover); color: var(--ink); }
+    .nav-item.active {
+      background: var(--surface); color: var(--accent); font-weight: 600;
+      box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 0 0 1px var(--border);
+    }
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .nav-badge {
+      margin-left: auto; font-size: 10.5px; font-weight: 600; color: var(--faint);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Clean Sidebar Footer Status Pills (V1 style) */
+    .sidebar-footer { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+    .health-strip {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border);
+      font-size: 11px; color: var(--ink-2);
+    }
+    .dot-good { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); display: inline-block; margin-right: 6px; }
+
+    /* Right Workspace — Open Full-Width Layout (No Right TOC Rail) */
+    .main-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .pane-topbar {
+      padding: 20px 28px 16px; border-bottom: 1px solid var(--border); background: var(--win-bg);
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    }
+    .pane-title-row { display: flex; align-items: center; gap: 10px; }
+    .pane-title { font-size: 20px; font-weight: 700; letter-spacing: -0.025em; }
+    .pane-desc { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .save-pill {
+      display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500;
+      padding: 2px 8px; border-radius: 99px; background: var(--good-soft); color: var(--good);
+    }
+
+    .pane-scroll { flex: 1; min-width: 0; overflow-y: auto; padding: 22px 28px 40px; }
+    .pane-inner { max-width: 780px; margin: 0 auto; }
+
+    /* V1 Bento Overview Grid */
+    .bento-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;
+    }
+    .bento-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 16px; box-shadow: var(--shadow-card);
+      display: flex; flex-direction: column; gap: 7px;
+    }
+    .bento-top { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--muted); font-weight: 500; }
+    .bento-val { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+    .bento-sub { font-size: 11px; color: var(--faint); }
+
+    /* Sub-tabs in header to keep long pages airy and scannable */
+    .pane-tabs {
+      display: inline-flex; padding: 3px; border-radius: 9px;
+      background: var(--surface-subtle); border: 1px solid var(--border); gap: 2px;
+    }
+    .pane-tab {
+      padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      color: var(--muted); transition: all 0.14s;
+    }
+    .pane-tab:hover { color: var(--ink); }
+    .pane-tab.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
+    /* Grouped Settings Cards */
+    .group-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 22px 0 8px;
+    }
+    .group-header:first-child { margin-top: 0; }
+    .group-title { font-size: 12px; font-weight: 600; color: var(--muted); }
+    .s-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; box-shadow: var(--shadow-card); overflow: hidden;
+    }
+    .s-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 20px;
+      padding: 13px 18px; border-bottom: 1px solid var(--border);
+    }
+    .s-row:last-child { border-bottom: none; }
+    .s-info { min-width: 0; flex: 1; }
+    .s-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+    .s-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+
+    /* Unified Hairline Range Sliders Across Entire App */
+    .range-wrap { display: flex; align-items: center; gap: 10px; width: 200px; }
+    .range-wrap input[type="range"] {
+      -webkit-appearance: none; appearance: none; flex: 1; height: 3px;
+      border-radius: 99px; background: var(--border-strong); outline: none; cursor: pointer;
+    }
+    .range-wrap input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 13px; height: 13px; border-radius: 50%;
+      background: var(--surface); border: 1.5px solid var(--accent);
+      box-shadow: 0 1px 3px rgba(15,23,42,0.2);
+    }
+    .range-val { min-width: 44px; text-align: right; font-size: 12px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+    /* Controls */
+    .toggle {
+      width: 36px; height: 21px; border-radius: 999px; background: var(--border-strong);
+      position: relative; transition: background 0.18s; flex-shrink: 0;
+    }
+    .toggle::after {
+      content: ""; position: absolute; top: 2.5px; left: 2.5px; width: 16px; height: 16px;
+      border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.22);
+      transition: transform 0.18s;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle.on::after { transform: translateX(15px); }
+
+    .select-ctrl, .input-ctrl {
+      height: 31px; padding: 0 10px; border-radius: 7px;
+      border: 1px solid var(--border-strong); background: var(--surface-subtle);
+      font-size: 12px; font-weight: 500; outline: none; min-width: 165px;
+    }
+    .select-ctrl:focus, .input-ctrl:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+    .seg {
+      display: inline-flex; padding: 2.5px; border-radius: 8px;
+      background: var(--surface-subtle); border: 1px solid var(--border); gap: 2px;
+    }
+    .seg button {
+      padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--muted);
+    }
+    .seg button.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
+    .swatch-row { display: flex; align-items: center; gap: 6px; }
+    .swatch {
+      width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--surface);
+      box-shadow: 0 0 0 1px var(--border-strong);
+    }
+    .swatch.active { box-shadow: 0 0 0 2px var(--accent); }
+
+    /* Original-Style Hotkey Row */
+    .hotkey-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 14px;
+      padding: 10px 16px; border-bottom: 1px solid var(--border); transition: background 0.12s;
+    }
+    .hotkey-row:last-child { border-bottom: none; }
+    .hotkey-row:hover { background: var(--surface-subtle); }
+    .hotkey-controls { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+    .hotkey-display {
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      height: 33px; min-width: 154px; padding: 0 11px; border-radius: 8px;
+      border: 1px solid var(--border-strong); background: var(--surface); transition: all 0.16s;
+    }
+    .hotkey-display:hover { border-color: var(--accent); }
+    .hotkey-display.unset { border: 1.5px dashed var(--border-strong); background: var(--surface-subtle); }
+    .hotkey-display.recording { border: 1.5px solid var(--accent); background: var(--accent-soft); animation: hkPulse 1.8s infinite; }
+    @keyframes hkPulse { 0%,100% { box-shadow: 0 0 0 2px var(--accent-soft); } 50% { box-shadow: 0 0 0 5px var(--accent-soft); } }
+    .hk-mod { font-size: 13.5px; color: var(--faint); opacity: 0.45; }
+    .hk-mod.active { color: var(--ink); opacity: 1; font-weight: 600; }
+    .hk-key { margin-left: 4px; font-size: 13.5px; font-weight: 700; color: var(--accent); }
+    .hk-ph { margin-left: 4px; font-size: 11.5px; color: var(--faint); }
+    .hk-btn { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; color: var(--faint); }
+    .hk-btn:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
+    .hk-btn.del:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
+    .hk-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .tool-sc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px 16px; }
+    .tool-sc-cell {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 10px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--border); font-size: 12px;
+    }
+    .tool-sc-key {
+      min-width: 30px; height: 22px; padding: 0 7px; border-radius: 5px;
+      background: var(--surface); border: 1px solid var(--border-strong);
+      font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--accent);
+      display: grid; place-items: center;
+    }
+
+    /* Provider Cards */
+    .provider-row {
+      display: flex; align-items: center; gap: 13px; padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .provider-row:last-child { border-bottom: none; }
+    .provider-row.active-row { background: var(--accent-soft); }
+    .p-avatar {
+      width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+      font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .tag { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 99px; background: var(--surface-subtle); color: var(--muted); }
+    .tag.good { background: var(--good-soft); color: var(--good); }
+    .tag.warn { background: var(--warn-soft); color: var(--warn); }
+    .tag.accent { background: var(--accent-soft); color: var(--accent); }
+
+    /* Library Split */
+    .library-split { flex: 1; display: grid; grid-template-columns: 320px 1fr; min-height: 0; }
+    .lib-col { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; background: var(--surface-subtle); }
+    .lib-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .lib-item { padding: 10px 11px; border-radius: 9px; text-align: left; border: 1px solid transparent; }
+    .lib-item:hover { background: var(--surface-hover); }
+    .lib-item.active { background: var(--surface); border-color: var(--accent-ring); box-shadow: var(--shadow-card); }
+
+    /* ══════════════════════════════════════════════════════════════
+       2. CAPTURE EDITOR — Matches Original Compact Single-Row Bar
+          + Floating Color/Stroke/Fill Quick Bar
+       ══════════════════════════════════════════════════════════════ */
+    .capture-stage {
+      width: 100%; max-width: 1080px; height: 680px;
+      border-radius: 14px; overflow: hidden; position: relative;
+      background: #141923; box-shadow: var(--shadow-win);
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 28px 24px 96px;
+    }
+    .capture-desktop-dim {
+      position: absolute; inset: 0;
+      background: radial-gradient(circle at 25% 20%, rgba(59,130,246,0.18), transparent 55%),
+                  linear-gradient(135deg, #1a2130 0%, #0f141e 100%);
+    }
+    .capture-board-wrap {
+      position: relative; z-index: 2;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.55), 0 0 0 2px #5b7fff;
+      line-height: 0;
+    }
+    #capture-canvas { display: block; max-width: 820px; width: 100%; height: auto; cursor: crosshair; }
+    .capture-size-badge {
+      position: absolute; top: -27px; left: 0;
+      padding: 3px 8px; border-radius: 5px; background: rgba(15, 23, 42, 0.9);
+      color: #f8fafc; font-family: var(--font-mono); font-size: 11px; line-height: 1.25;
+    }
+    .sel-dot {
+      position: absolute; width: 8px; height: 8px; border-radius: 50%;
+      background: #fff; border: 1.5px solid #5b7fff;
+    }
+
+    /* Original Compact Light-Surface Floating Toolbar (as in screenshot) */
+    .orig-toolbar-stack {
+      position: relative; z-index: 5; margin-top: 12px;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .orig-capture-toolbar {
+      display: inline-flex; align-items: center; gap: 2px;
+      height: 40px; padding: 0 8px; border-radius: 9px;
+      background: rgba(255, 255, 255, 0.96); color: #334155;
+      border: 1px solid rgba(15, 23, 42, 0.14);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
+    }
+    [data-theme="dark"] .orig-capture-toolbar {
+      background: rgba(28, 35, 48, 0.96); color: #e2e8f0;
+      border-color: rgba(255, 255, 255, 0.14);
+    }
+    .ot-btn {
+      height: 28px; min-width: 28px; padding: 0 5px; border-radius: 6px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 1px;
+      color: inherit; font-size: 11.5px; font-weight: 600; transition: all 0.12s;
+      white-space: nowrap;
+    }
+    .ot-btn:hover { background: rgba(37, 99, 235, 0.08); color: #2563eb; }
+    .ot-btn.active { background: rgba(37, 99, 235, 0.12); color: #2563eb; box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.28); }
+    .ot-btn svg { width: 17px; height: 17px; flex-shrink: 0; }
+    .ot-btn .chev { width: 8px; height: 8px; margin-left: -2px; }
+    .ot-div { width: 1px; height: 18px; background: rgba(15, 23, 42, 0.14); margin: 0 4px; flex-shrink: 0; }
+    [data-theme="dark"] .ot-div { background: rgba(255, 255, 255, 0.16); }
+
+    .rw-action-chip {
+      width: 24px; height: 24px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--surface);
+      display: grid; place-items: center; color: var(--muted); transition: all 0.14s;
+    }
+    .rw-action-chip:hover { border-color: var(--border-strong); background: var(--surface-subtle); color: var(--ink); }
+    .rw-action-chip.fav-active { border-color: rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.12); color: #d97706; }
+    .rw-action-chip svg { width: 15px; height: 15px; }
+    .rw-card-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface-subtle);
+    }
+    .rw-provider-icon {
+      width: 20px; height: 20px; border-radius: 5px;
+      display: grid; place-items: center; flex-shrink: 0;
+      background: var(--surface); border: 1px solid var(--border);
+    }
+    .rw-provider-icon svg { width: 13px; height: 13px; }
+
+    /* Retained Quick Color / Stroke / Fill Sub-bar */
+    .quick-prop-bar {
+      display: inline-flex; align-items: center; gap: 10px;
+      height: 34px; padding: 0 12px; border-radius: 8px;
+      background: rgba(255, 255, 255, 0.95); color: #334155;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.24);
+      font-size: 11.5px;
+    }
+    [data-theme="dark"] .quick-prop-bar {
+      background: rgba(28, 35, 48, 0.95); color: #e2e8f0;
+      border-color: rgba(255, 255, 255, 0.14);
+    }
+    .qp-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid transparent; }
+    .qp-dot.active { border-color: #2563eb; transform: scale(1.12); }
+
+    /* ══════════════════════════════════════════════════════════════
+       3. REDESIGNED PINNED IMAGE SCENE — Light Native Floating Surface
+          (Clean borderless image + compact icon toolbar + hairline sliders)
+       ══════════════════════════════════════════════════════════════ */
+    .pin-desktop-canvas {
+      width: 100%; max-width: 1080px; height: 680px;
+      border-radius: 14px; overflow: hidden; position: relative;
+      background:
+        radial-gradient(circle at 22% 18%, rgba(37, 99, 235, 0.08), transparent 45%),
+        radial-gradient(circle at 82% 80%, rgba(15, 23, 42, 0.05), transparent 42%),
+        var(--win-bg);
+      box-shadow: var(--shadow-win); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; gap: 36px; padding: 32px;
+    }
+    .pin-stage-col {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; min-width: 0;
+    }
+    .pin-window-shell {
+      position: relative; width: 450px; max-width: 100%;
+      transition: transform 0.18s ease;
+    }
+    .pin-frame {
+      position: relative; border-radius: 8px; overflow: hidden;
+      background: #f4f1e7;
+      box-shadow: 0 22px 48px -12px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.1);
+      transition: box-shadow 0.18s ease, filter 0.18s ease, opacity 0.12s ease;
+    }
+    .pin-frame.bordered {
+      box-shadow: 0 22px 48px -12px rgba(15, 23, 42, 0.22), 0 0 0 1.5px var(--accent);
+    }
+    .pin-frame.grayscale { filter: grayscale(1); }
+    .pin-frame.invert { filter: invert(1); }
+
+    /* Unified Bottom Floating Control Bar Below Pinned Image (Nothing Covers the Image) */
+    .pin-bottom-dock {
+      display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;
+      padding: 6px 10px; border-radius: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      font-size: 11.5px; color: var(--muted);
+    }
+    .pin-tbtn {
+      width: 26px; height: 26px; border-radius: 6px;
+      display: grid; place-items: center; color: var(--muted);
+      transition: all 0.12s ease;
+    }
+    .pin-tbtn:hover { background: var(--surface-hover); color: var(--ink); }
+    .pin-tbtn.active { background: var(--accent-soft); color: var(--accent); }
+    .pin-tbtn.danger:hover { background: var(--danger-soft); color: var(--danger); }
+    .pin-tbtn svg { width: 15px; height: 15px; }
+    .pin-tsep { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
+    .pin-slider-group { display: inline-flex; align-items: center; gap: 7px; padding: 0 4px; }
+    .pin-slider-val {
+      font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+      color: var(--ink-2); min-width: 34px; text-align: right; font-variant-numeric: tabular-nums;
+    }
+    input.thin-range {
+      -webkit-appearance: none; appearance: none;
+      width: 78px; height: 3px; border-radius: 99px;
+      background: var(--border-strong); outline: none; cursor: pointer;
+    }
+    input.thin-range::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--surface); border: 1.5px solid var(--accent);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
+      transition: transform 0.12s ease;
+    }
+    input.thin-range::-webkit-slider-thumb:hover { transform: scale(1.15); }
+    input.thin-range::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--surface); border: 1.5px solid var(--accent);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
+    }
+
+    /* OCR Floating Window Redesigned */
+    .ocr-body-wrap { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .ocr-split-grid { display: grid; grid-template-columns: 250px 1fr; gap: 12px; min-height: 310px; }
+    .ocr-img-card {
+      border: 1px solid var(--border); border-radius: 11px; background: var(--surface-subtle);
+      padding: 10px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .ocr-img-preview {
+      flex: 1; border-radius: 7px; padding: 18px 16px; background: #f4f1e7; color: #354337;
+      font-family: Georgia, serif; border: 1px solid var(--border);
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .ocr-text-card {
+      border: 1px solid var(--border); border-radius: 11px; background: var(--surface);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .ocr-tokens-strip {
+      padding: 8px 12px; border-top: 1px solid var(--border); background: var(--surface-subtle);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .ocr-token-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 8px; border-radius: 6px; font-size: 11px;
+      background: var(--surface); border: 1px solid var(--border); color: var(--ink-2);
+      transition: all 0.12s;
+    }
+    .ocr-token-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .ocr-token-chip span { color: var(--faint); font-size: 10px; }
+
+    /* Right Side Context Menu + Shortcut Sheet */
+    .pin-inspector-card {
+      width: 280px; flex-shrink: 0;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      box-shadow: var(--shadow-card); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .pin-menu-preview {
+      border-radius: 9px; border: 1px solid var(--border); background: var(--win-bg);
+      padding: 4px; display: flex; flex-direction: column; gap: 1px;
+    }
+    .pin-menu-row {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 27px; padding: 0 8px; border-radius: 5px; font-size: 12px; color: var(--ink-2);
+      transition: background 0.1s;
+    }
+    .pin-menu-row:hover { background: var(--surface-hover); color: var(--ink); }
+    .pin-menu-row.danger { color: var(--danger); }
+    .pin-menu-row.danger:hover { background: var(--danger-soft); }
+    .pin-menu-row kbd {
+      font-family: var(--font-mono); font-size: 10.5px; color: var(--faint);
+    }
+    .pin-menu-sep { height: 1px; background: var(--border); margin: 3px 6px; }
+
+    /* ══════════════════════════════════════════════════════════════
+       4. TRANSLATION & OCR FLOATING WINDOWS — Original Crisp SVG Icons
+       ══════════════════════════════════════════════════════════════ */
+    .result-window {
+      width: 580px; max-width: 100%; background: var(--surface);
+      border-radius: 14px; box-shadow: var(--shadow-float); border: 1px solid var(--border); overflow: hidden;
+    }
+    .ocr-window {
+      width: 760px; max-width: 100%; background: var(--surface);
+      border-radius: 14px; box-shadow: var(--shadow-float); border: 1px solid var(--border); overflow: hidden;
+    }
+    .rw-header {
+      height: 48px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      border-bottom: 1px solid var(--border); background: var(--surface);
+    }
+    .rw-icon-btn {
+      width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center;
+      color: var(--muted); transition: all 0.14s;
+    }
+    .rw-icon-btn:hover { background: var(--surface-hover); color: var(--ink); }
+    .rw-icon-btn.pinned { background: var(--accent-soft); color: var(--accent); }
+    .rw-icon-btn svg { width: 17px; height: 17px; }
+    .rw-badge-icon {
+      width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center;
+      background: var(--accent-soft); color: var(--accent);
+    }
+    .rw-badge-icon svg { width: 16px; height: 16px; }
+    .lang-bar {
+      display: grid; grid-template-columns: 1fr 40px 1fr; align-items: center;
+      background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 10px; height: 38px;
+      font-size: 13px; font-weight: 600;
+    }
+    .lang-bar button { height: 100%; display: grid; place-items: center; }
+    .lang-bar button:hover { background: var(--surface-hover); }
+    .rw-source-box {
+      background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 11px; padding: 10px 12px;
+    }
+    .rw-result-card {
+      border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px; background: var(--win-bg);
+    }
+
+    @media (max-width: 920px) {
+      .settings-window { height: auto; flex-direction: column; }
+      .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+      .toc-rail { display: none; }
+      .pin-desktop-canvas { height: auto; flex-direction: column; }
+      .library-split { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="preview-bar">
+    <div class="preview-brand">
+      <div class="logo-mark">S</div>
+      <span>SnapLingo 设计预览</span>
+    </div>
+
+    <div class="scene-tabs" role="tablist">
+      <button class="scene-tab active" data-scene="settings">设置主窗口</button>
+      <button class="scene-tab" data-scene="library">资料库</button>
+      <button class="scene-tab" data-scene="capture">截图编辑器</button>
+      <button class="scene-tab" data-scene="pin">桌面贴图</button>
+      <button class="scene-tab" data-scene="translate">翻译浮窗</button>
+      <button class="scene-tab" data-scene="ocr">OCR 浮窗</button>
+    </div>
+
+    <button class="pill-btn primary" id="btn-theme">切换深色</button>
+  </header>
+
+  <main class="stage">
+    <!-- ═══════════════ 1. 回归第一版清爽布局 + 全功能设置主窗口 ═══════════════ -->
+    <div class="settings-window" id="scene-settings-window">
+      <aside class="sidebar">
+        <div class="win-chrome">
+          <div class="traffic-lights"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span></div>
+        </div>
+        <div class="app-brand-row">
+          <div class="app-brand-logo">S</div>
+          <div>
+            <div class="app-brand-title">SnapLingo</div>
+            <div class="app-brand-ver">v0.1.33</div>
+          </div>
+        </div>
+
+        <div class="nav-group-label">工作台</div>
+        <nav class="nav-list">
+          <button class="nav-item active" data-page="overview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            概览与快捷键
+          </button>
+          <button class="nav-item" data-page="screenshot">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            截图与贴图
+          </button>
+          <button class="nav-item" data-page="translation">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            翻译与识别
+          </button>
+          <button class="nav-item" data-page="services">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><rect x="6" y="8" width="12" height="8" rx="1"/><rect x="4" y="18" width="16" height="4" rx="1"/></svg>
+            引擎与语音
+            <span class="nav-badge">3</span>
+          </button>
+          <button class="nav-item" data-page="general">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M4 6h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
+            通用设置
+          </button>
+        </nav>
+
+        <div class="nav-group-label">内容沉淀</div>
+        <nav class="nav-list">
+          <button class="nav-item" data-page="library">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg>
+            资料库
+            <span class="nav-badge">128</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="health-strip"><span><i class="dot-good"></i>系统权限就绪</span></div>
+          <div class="health-strip"><span><i class="dot-good"></i>2 翻译 + 1 OCR 在线</span></div>
+        </div>
+      </aside>
+
+      <!-- ── PAGE 0: 概览与快捷键 (保留第一版高辨识度 Bento 卡片 + 全部原版样式快捷键) ── -->
+      <section class="main-pane" id="page-overview">
+        <header class="pane-topbar">
+          <div>
+            <div class="pane-title-row">
+              <h1 class="pane-title">概览与快捷键</h1>
+              <span class="save-pill">● 自动保存</span>
+            </div>
+            <p class="pane-desc">系统状态一览与全部全局快捷键管理，点击按键即可重新录制</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="pill-btn" onclick="alert('未检测到全局快捷键冲突')">检测冲突</button>
+            <button class="pill-btn" onclick="alert('已恢复全部默认快捷键')">全部恢复默认</button>
+          </div>
+        </header>
+        <div class="pane-scroll">
+          <div class="pane-inner">
+            <div class="bento-grid">
+              <div class="bento-card">
+                <div class="bento-top"><span>系统权限</span><span class="tag good">已授权</span></div>
+                <div class="bento-val">屏幕录制 & 辅助</div>
+                <div class="bento-sub">截图、窗口吸附与划词取词正常</div>
+              </div>
+              <div class="bento-card">
+                <div class="bento-top"><span>当前 OCR 引擎</span><span class="tag good">本地</span></div>
+                <div class="bento-val">Apple Vision</div>
+                <div class="bento-sub">离线识别 · 图像不离开设备</div>
+              </div>
+              <div class="bento-card">
+                <div class="bento-top"><span>激活翻译引擎</span><span class="tag accent">并发</span></div>
+                <div class="bento-val">Google + DeepLX</div>
+                <div class="bento-sub">支持拖拽排序与自定义 LLM</div>
+              </div>
+            </div>
+
+            <div class="group-header"><span class="group-title">截图与贴图快捷键</span></div>
+            <div class="s-card" id="hk-screenshot"></div>
+
+            <div class="group-header"><span class="group-title">翻译快捷键</span></div>
+            <div class="s-card" id="hk-translation"></div>
+
+            <div class="group-header"><span class="group-title">OCR 快捷键</span></div>
+            <div class="s-card" id="hk-ocr"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PAGE 1: 截图与贴图 (顶部轻分段：保存与长截图 / 选区与贴图 / 编辑器工具键) ── -->
+      <section class="main-pane hidden" id="page-screenshot">
+        <header class="pane-topbar">
+          <div>
+            <div class="pane-title-row"><h1 class="pane-title">截图与贴图</h1><span class="save-pill">● 自动保存</span></div>
+            <p class="pane-desc">保存输出、长截图上限、选区样式、贴图行为与编辑器单键</p>
+          </div>
+          <div class="pane-tabs" data-panetabs="screenshot">
+            <button class="pane-tab active" data-panel="ss-p-output">保存与选区</button>
+            <button class="pane-tab" data-panel="ss-p-pin">贴图与缩放</button>
+            <button class="pane-tab" data-panel="ss-p-keys">编辑器按键</button>
+          </div>
+        </header>
+        <div class="pane-scroll">
+          <div class="pane-inner">
+            <div id="ss-p-output">
+              <div class="group-header"><span class="group-title">保存与长截图</span></div>
+              <div class="s-card">
+                <div class="s-row">
+                  <div class="s-info"><div class="s-label">默认保存路径</div><div class="s-sub">快捷保存（⌘⇧S）与长截图自动保存目录</div></div>
+                  <div style="display:flex;gap:6px;"><input class="input-ctrl" value="~/Pictures/SnapLingo" style="width:190px;" /><button class="pill-btn">浏览</button></div>
+                </div>
+                <div class="s-row">
+                  <div class="s-info"><div class="s-label">图片格式与命名</div><div class="s-sub">PNG / WebP 为无损压缩</div></div>
+                  <div style="display:flex;gap:8px;">
+                    <select class="select-ctrl" style="min-width:116px;"><option>PNG（无损）</option><option>JPG (92%)</option><option>WebP（无损）</option></select>
+                    <select class="select-ctrl" style="min-width:130px;"><option>日期与时间</option><option>Unix 毫秒</option><option>计数器</option><option>自定义前缀</option></select>
+                  </div>
+                </div>
+                <div class="s-row"><div class="s-info"><div class="s-label">截图后自动复制</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row">
+                  <div class="s-info"><div class="s-label">长截图最大高度</div><div class="s-sub">达到上限自动复制并保存 PNG</div></div>
+                  <div style="display:flex;align-items:center;gap:6px;"><input class="input-ctrl" type="number" value="30000" style="width:110px;min-width:0;" /><span style="font-size:12px;color:var(--muted);">px</span></div>
+                </div>
+              </div>
+
+              <div class="group-header"><span class="group-title">选区外观与放大镜</span></div>
+              <div class="s-card">
+                <div class="s-row">
+                  <div class="s-info"><div class="s-label">选区边框颜色与宽度</div></div>
+                  <div style="display:flex;align-items:center;gap:12px;">
+                    <div class="swatch-row">
+                      <button class="swatch active" style="background:#5b7fff;" onclick="pickSwatch(this)"></button>
+                      <button class="swatch" style="background:#ff4d4f;" onclick="pickSwatch(this)"></button>
+                      <button class="swatch" style="background:#28a745;" onclick="pickSwatch(this)"></button>
+                      <button class="swatch" style="background:#fadb14;" onclick="pickSwatch(this)"></button>
+                    </div>
+                    <div class="range-wrap" style="width:130px;"><input type="range" min="1" max="8" value="2" oninput="this.nextElementSibling.textContent=this.value+'px'" /><span class="range-val">2px</span></div>
+                  </div>
+                </div>
+                <div class="s-row">
+                  <div class="s-info"><div class="s-label">遮罩不透明度</div></div>
+                  <div class="range-wrap"><input type="range" min="0" max="90" value="42" oninput="this.nextElementSibling.textContent=this.value+'%'" /><span class="range-val">42%</span></div>
+                </div>
+                <div class="s-row"><div class="s-info"><div class="s-label">显示选区尺寸</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row">
+                  <div class="s-info"><div class="s-label">显示像素放大镜 & 倍率</div><div class="s-sub">按住 Alt 可临时呼出放大镜与取色器</div></div>
+                  <div style="display:flex;align-items:center;gap:12px;">
+                    <div class="range-wrap" style="width:140px;"><input type="range" min="4" max="20" value="12" oninput="this.nextElementSibling.textContent=this.value+'×'" /><span class="range-val">12×</span></div>
+                    <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+                  </div>
+                </div>
+                <div class="s-row"><div class="s-info"><div class="s-label">记住上次使用的标注工具</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              </div>
+            </div>
+
+            <div id="ss-p-pin" class="hidden">
+              <div class="group-header"><span class="group-title">桌面贴图设置</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">贴图初始位置</div></div><div class="seg"><button class="active" onclick="segPick(this)">截图原位置</button><button onclick="segPick(this)">桌面中央（级联）</button></div></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">贴图默认透明度</div></div><div class="range-wrap"><input type="range" min="5" max="100" value="100" oninput="this.nextElementSibling.textContent=this.value+'%'" /><span class="range-val">100%</span></div></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">贴图显示阴影</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">默认显示贴图边框</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">统一界面缩放</div><div class="s-sub">应用于设置、截图工具栏、长截图控件与光标</div></div><select class="select-ctrl"><option>自动（跟随显示器）</option><option>100%</option><option>125%</option><option>150%</option><option>175%</option><option>200%</option></select></div>
+              </div>
+            </div>
+
+            <div id="ss-p-keys" class="hidden">
+              <div class="group-header"><span class="group-title">编辑器内单键绑定（点击修改，Delete 清除）</span></div>
+              <div class="s-card">
+                <div class="tool-sc-grid">
+                  <div class="tool-sc-cell"><span>矩形框</span><button class="tool-sc-key">B</button></div>
+                  <div class="tool-sc-cell"><span>椭圆</span><button class="tool-sc-key">O</button></div>
+                  <div class="tool-sc-cell"><span>箭头</span><button class="tool-sc-key">A</button></div>
+                  <div class="tool-sc-cell"><span>直线</span><button class="tool-sc-key">L</button></div>
+                  <div class="tool-sc-cell"><span>画笔</span><button class="tool-sc-key">P</button></div>
+                  <div class="tool-sc-cell"><span>荧光笔</span><button class="tool-sc-key">H</button></div>
+                  <div class="tool-sc-cell"><span>区域高亮</span><button class="tool-sc-key">Q</button></div>
+                  <div class="tool-sc-cell"><span>模糊</span><button class="tool-sc-key">U</button></div>
+                  <div class="tool-sc-cell"><span>聚光灯</span><button class="tool-sc-key">G</button></div>
+                  <div class="tool-sc-cell"><span>马赛克</span><button class="tool-sc-key">M</button></div>
+                  <div class="tool-sc-cell"><span>文字</span><button class="tool-sc-key">T</button></div>
+                  <div class="tool-sc-cell"><span>橡皮擦</span><button class="tool-sc-key">E</button></div>
+                  <div class="tool-sc-cell"><span>长截图</span><button class="tool-sc-key">S</button></div>
+                  <div class="tool-sc-cell"><span>贴图边框</span><button class="tool-sc-key">B</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PAGE 2: 翻译与识别 (整合翻译设置 + OCR 设置，顶部轻分段切换) ── -->
+      <section class="main-pane hidden" id="page-translation">
+        <header class="pane-topbar">
+          <div>
+            <div class="pane-title-row"><h1 class="pane-title">翻译与识别</h1><span class="save-pill">● 自动保存</span></div>
+            <p class="pane-desc">默认语种、划词取词、结果浮窗行为与 OCR 文字处理</p>
+          </div>
+          <div class="pane-tabs" data-panetabs="translation">
+            <button class="pane-tab active" data-panel="tr-p-basic">翻译偏好</button>
+            <button class="pane-tab" data-panel="tr-p-window">浮窗布局</button>
+            <button class="pane-tab" data-panel="tr-p-ocr">OCR 识别</button>
+          </div>
+        </header>
+        <div class="pane-scroll">
+          <div class="pane-inner">
+            <div id="tr-p-basic">
+              <div class="group-header"><span class="group-title">默认语言与取词</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">源语言 → 目标语言</div></div><div style="display:flex;align-items:center;gap:8px;"><select class="select-ctrl" style="min-width:120px;"><option>自动检测</option><option>English</option><option>日本語</option></select><span style="color:var(--faint);">→</span><select class="select-ctrl" style="min-width:120px;"><option>自动</option><option>简体中文</option><option>English</option></select></div></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">划词取词模式</div><div class="s-sub">智能模式优先使用系统辅助功能，失败时回退剪贴板</div></div><div class="seg"><button class="active" onclick="segPick(this)">智能模式</button><button onclick="segPick(this)">效果优先</button><button onclick="segPick(this)">速度优先</button></div></div>
+              </div>
+              <div class="group-header"><span class="group-title">翻译行为</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">自动翻译</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">增量翻译</div><div class="s-sub">追加文字时保留已经完成的结果</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">翻译后自动复制</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">保留原文换行</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              </div>
+            </div>
+
+            <div id="tr-p-window" class="hidden">
+              <div class="group-header"><span class="group-title">结果窗口位置与尺寸</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">划词与截图翻译窗口</div></div><select class="select-ctrl"><option>鼠标下方</option><option>鼠标位置</option><option>居中</option><option>上次停留位置</option></select></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">手动翻译窗口</div></div><select class="select-ctrl"><option>居中</option><option>鼠标下方</option><option>上次停留位置</option></select></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">窗口宽度</div></div><div class="range-wrap"><input type="range" min="300" max="1000" step="10" value="660" oninput="this.nextElementSibling.textContent=this.value+'pt'" /><span class="range-val">660pt</span></div></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">最高屏幕占比</div></div><div class="range-wrap"><input type="range" min="30" max="90" value="70" oninput="this.nextElementSibling.textContent=this.value+'%'" /><span class="range-val">70%</span></div></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">划词 / 截图原文框状态</div></div><div style="display:flex;gap:8px;"><select class="select-ctrl" style="min-width:128px;"><option>划词：上次状态</option><option>总是折叠</option><option>总是展开</option></select><select class="select-ctrl" style="min-width:128px;"><option>截图：上次状态</option><option>总是折叠</option><option>总是展开</option></select></div></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">结果窗口置顶 / 失去焦点时隐藏</div></div><div style="display:flex;align-items:center;gap:12px;"><span style="font-size:12px;color:var(--muted);">置顶</span><button class="toggle" onclick="this.classList.toggle('on')"></button><span style="font-size:12px;color:var(--muted);">失焦隐藏</span><button class="toggle on" onclick="this.classList.toggle('on')"></button></div></div>
+              </div>
+            </div>
+
+            <div id="tr-p-ocr" class="hidden">
+              <div class="group-header"><span class="group-title">OCR 识别与文本处理</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">识别语言</div></div><select class="select-ctrl"><option>自动检测</option><option>中文简体</option><option>中文繁體</option><option>English</option><option>日本語</option><option>한국어</option></select></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">保留文本格式</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">中文自动去除空格</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">显示识别置信度</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">OCR 窗口位置</div></div><select class="select-ctrl"><option>鼠标位置</option><option>鼠标下方</option><option>居中</option><option>上次停留位置</option></select></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">隐藏静默识别状态提示</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PAGE 3: 引擎与语音 ── -->
+      <section class="main-pane hidden" id="page-services">
+        <header class="pane-topbar">
+          <div>
+            <div class="pane-title-row"><h1 class="pane-title">引擎与语音</h1><span class="save-pill">● 自动保存</span></div>
+            <p class="pane-desc">翻译支持多引擎并发与拖拽排序，OCR 单选切换，含系统语音合成</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="pane-tabs" data-panetabs="services">
+              <button class="pane-tab active" data-panel="srv-p-tr">翻译服务</button>
+              <button class="pane-tab" data-panel="srv-p-ocr">OCR 服务</button>
+              <button class="pane-tab" data-panel="srv-p-tts">语音合成</button>
+            </div>
+            <button class="pill-btn primary" onclick="alert('打开自定义 OpenAI / Claude / Gemini 翻译配置')">+ 添加 AI</button>
+          </div>
+        </header>
+        <div class="pane-scroll">
+          <div class="pane-inner">
+            <div id="srv-p-tr">
+              <div class="group-header"><span class="group-title">已激活：Google 翻译、DeepLX（并发对比）</span></div>
+              <div class="s-card">
+                <div class="provider-row active-row">
+                  <div class="p-avatar" style="background:#ffffff;border:1px solid var(--border);">
+                    <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                  </div>
+                  <div class="s-info"><div style="display:flex;align-items:center;gap:7px;"><strong style="font-size:13px;">Google 翻译</strong><span class="tag good">已启用</span><span class="tag">内置</span></div><div class="s-sub">免配置开箱即用，支持多语种互译</div></div>
+                  <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+                </div>
+                <div class="provider-row active-row">
+                  <div class="p-avatar" style="background:#0F2B46;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="M20.907 4.93953 12.68543.18573a1.3577 1.3577 0 0 0-1.3709 0L3.09298 4.9565a1.3766 1.3766 0 0 0-.68639 1.18233v9.52646a1.3766 1.3766 0 0 0 .68639 1.19363l8.22157 4.75946.06223.03583 4.04856 2.3458-.01131-2.06106.0075-1.1446.0038.01885v-.38467c0-.23006.1188-.43371.29605-.56005l.264-.15086.12633-.06977h-.0075l4.80283-2.7795a1.3803 1.3803 0 0 0 .68639-1.19551V6.13505a1.3803 1.3803 0 0 0-.68642-1.19552m-9.85269 9.68863a1.4275 1.4275 0 0 1-.39976 1.3841 1.4086 1.4086 0 0 1-1.97054 0 1.4199 1.4199 0 0 1 0-2.06294 1.4086 1.4086 0 0 1 2.0422.07543l3.32822-1.91585.6864.38656zm5.77019-2.41367a1.4086 1.4086 0 0 1-1.97054 0 1.4256 1.4256 0 0 1-.3696-1.47837l-.0132.0075-3.7525-2.1723-.05657.05656a1.4086 1.4086 0 0 1-1.97053 0 1.4199 1.4199 0 0 1 0-2.06293 1.4086 1.4086 0 0 1 1.97242 0c.3941.37713.52422.91832.39033 1.40672l3.7808 2.20059.01886-.01886a1.4086 1.4086 0 0 1 1.97242 0 1.42746 1.42746 0 0 1 0 2.06105z"/></svg>
+                  </div>
+                  <div class="s-info"><div style="display:flex;align-items:center;gap:7px;"><strong style="font-size:13px;">DeepLX</strong><span class="tag good">已启用</span></div><div class="s-sub" style="color:var(--accent);">http://localhost:1188/translate</div></div>
+                  <button class="pill-btn" style="height:27px;font-size:11px;">编辑</button>
+                  <button class="pill-btn" style="height:27px;font-size:11px;">测试</button>
+                  <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+                </div>
+                <div class="provider-row">
+                  <div class="p-avatar" style="background:#10a37f;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
+                  </div>
+                  <div class="s-info"><div style="display:flex;align-items:center;gap:7px;"><strong style="font-size:13px;">OpenAI (GPT-4o mini)</strong><span class="tag">自定义 Prompt</span></div><div class="s-sub">OpenAI 兼容接口 · 支持自定义术语与翻译风格</div></div>
+                  <button class="pill-btn" style="height:27px;font-size:11px;">编辑</button>
+                  <button class="pill-btn" style="height:27px;font-size:11px;">测试</button>
+                  <button class="toggle" onclick="this.classList.toggle('on')"></button>
+                </div>
+                <div class="provider-row">
+                  <div class="p-avatar" style="background:#D97757;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>
+                  </div>
+                  <div class="s-info"><div style="display:flex;align-items:center;gap:7px;"><strong style="font-size:13px;">Claude (Anthropic)</strong><span class="tag">自定义 Prompt</span></div><div class="s-sub">长文语境与润色翻译优化</div></div>
+                  <button class="pill-btn" style="height:27px;font-size:11px;">编辑</button>
+                  <button class="pill-btn" style="height:27px;font-size:11px;">测试</button>
+                  <button class="toggle" onclick="this.classList.toggle('on')"></button>
+                </div>
+                <div class="provider-row">
+                  <div class="p-avatar" style="background:#2932e1;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="M9.154 0C7.71 0 6.54 1.658 6.54 3.707c0 2.051 1.171 3.71 2.615 3.71 1.446 0 2.614-1.659 2.614-3.71C11.768 1.658 10.6 0 9.154 0zm7.025.594C14.86.58 13.347 2.589 13.2 3.927c-.187 1.745.25 3.487 2.179 3.735 1.933.25 3.175-1.806 3.422-3.364.252-1.555-.995-3.364-2.362-3.674a1.218 1.218 0 0 0-.261-.03zM3.582 5.535a2.811 2.811 0 0 0-.156.008c-2.118.19-2.428 3.24-2.428 3.24-.287 1.41.686 4.425 3.297 3.864 2.617-.561 2.262-3.68 2.183-4.362-.125-1.018-1.292-2.773-2.896-2.75zm16.534 1.753c-2.308 0-2.617 2.119-2.617 3.616 0 1.43.121 3.425 2.988 3.362 2.867-.063 2.553-3.238 2.553-3.988 0-.745-.62-2.99-2.924-2.99zm-8.264 2.478c-1.424.014-2.708.925-3.323 1.947-1.118 1.868-2.863 3.05-3.112 3.363-.25.309-3.61 2.116-2.864 5.42.746 3.301 3.365 3.237 3.365 3.237s1.93.19 4.171-.31c2.24-.495 4.17.123 4.17.123s5.233 1.748 6.665-1.616c1.43-3.364-.808-5.109-.808-5.109s-2.99-2.306-4.736-4.798c-1.072-1.665-2.348-2.268-3.528-2.257zm-2.234 3.84l1.542.024v8.197H7.758c-1.47-.291-2.055-1.292-2.13-1.462-.072-.173-.488-.976-.268-2.343.635-2.049 2.447-2.196 2.447-2.196h1.81zm3.964 2.39v3.881c.096.413.612.488.612.488h1.614v-4.343h1.689v5.782h-3.915c-1.517-.39-1.59-1.465-1.59-1.465v-4.317zm-5.458 1.147c-.66.197-.978.708-1.05.928-.076.22-.247.78-.1 1.269.294 1.095 1.248 1.144 1.248 1.144h1.37v-3.34z"/></svg>
+                  </div>
+                  <div class="s-info"><div style="display:flex;align-items:center;gap:7px;"><strong style="font-size:13px;">百度翻译</strong><span class="tag warn">未配置</span></div><div class="s-sub">需要填写 App ID 与密钥</div></div>
+                  <button class="pill-btn" style="height:27px;font-size:11px;">配置</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="srv-p-ocr" class="hidden">
+              <div class="group-header"><span class="group-title">OCR 识别引擎（单选）</span></div>
+              <div class="s-card">
+                <div class="provider-row active-row">
+                  <div class="p-avatar" style="background:#111827;">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="#ffffff"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+                  </div>
+                  <div class="s-info"><div style="display:flex;align-items:center;gap:7px;"><strong style="font-size:13px;">Apple Vision (System OCR)</strong><span class="tag accent">当前使用</span><span class="tag good">本地处理</span></div><div class="s-sub">设备端原生识别</div></div>
+                  <span class="tag accent">已激活</span>
+                </div>
+                <div class="provider-row">
+                  <div class="p-avatar" style="background:#2932e1;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff"><path d="M12.17185 4.8315c-.6339 0-1.15033.51448-1.15033 1.14833s.51643 1.15033 1.15033 1.15033 1.14833-.51643 1.14833-1.15033-.51448-1.14833-1.14833-1.14833zm9.9916 0c-.6339 0-1.15033.51448-1.15033 1.14833s.51643 1.15033 1.15033 1.15033c.6339 0 1.14833-.51643 1.14833-1.15033S22.7973 4.8315 22.16345 4.8315zM6.67238 8.00711c-.0331 0-.06258.01885-.07617.04883l-1.95298 4.29274H.75286c-.05136 0-.09805.02932-.11913.07616l-.62691 1.39832c-.02155.04809.01363.10351.0664.10351h3.85327l-2.32796 5.1208c-.02545.0559.01465.12108.07617.12108h1.6561c.0331 0 .06438-.02064.07812-.05078l4.9977-10.99134c.02529-.0559-.01481-.11913-.07617-.11913zm3.4783 0c-.02484 0-.0483.01431-.0586.0371l-.58004 1.28513c-.01905.04216.01237.08984.05859.08984h1.02334c.21703-.00312.37745.01142.55466.03906.82499.12818 1.33602.73302 1.32412 1.5351-.01124.75786-.64035 1.36123-1.39832 1.36123H7.40865c-.06245 0-.11876.03691-.14452.09374l-.60935 1.33972c-.0295.0648.0188.13671.08984.13671h4.28495c1.77679 0 3.1942-1.5331 2.99592-3.2986-.1616-1.43981-1.34012-2.56875-2.81033-2.61894-.01327-.00047-.02641.0011-.03906.0039a.06152.06152 0 0 0-.02148-.0039zm6.4762 0c-.0331 0-.06438.0187-.07812.04883l-4.9977 10.99134c-.0253.0559.01676.12108.07812.12108h1.6561c.03294 0 .06259-.0208.07617-.05078l4.9997-10.99134c.02545-.0559-.01661-.11913-.07813-.11913zm3.4783 0c-.02498 0-.04633.01431-.05664.0371l-.58005 1.28513c-.01889.04216.01058.08984.05664.08984h1.02334c.21717-.00312.37744.01142.55465.03906.825.12818 1.33782.73302 1.32612 1.5351-.0114.75786-.64034 1.36123-1.39831 1.36123h-3.66778c-.06246 0-.11876.03691-.14452.09374l-.60935 1.33972c-.02934.0648.01864.13671.08984.13671h4.28494c1.7766 0 3.1961-1.5331 2.99782-3.2986-.16159-1.43981-1.34222-2.56875-2.81233-2.61894-.01343-.00047-.02642.0011-.03906.0039a.0611.0611 0 0 0-.02148-.0039z"/></svg>
+                  </div>
+                  <div class="s-info"><div style="display:flex;align-items:center;gap:7px;"><strong style="font-size:13px;">PaddleOCR</strong><span class="tag good">本地处理</span></div><div class="s-sub">内置 MNN 离线模型，中文排版优化</div></div>
+                  <button class="pill-btn" style="height:27px;font-size:11px;">启用</button>
+                </div>
+                <div class="provider-row">
+                  <div class="p-avatar" style="background:#334155;">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2.5 20.5 7v10L12 21.5 3.5 17V7L12 2.5Z"/><path d="M12 7.5 16 9.8v4.4L12 16.5 8 14.2V9.8L12 7.5Z"/><path d="M12 2.5v5M20.5 7 16 9.8M20.5 17 16 14.2M12 21.5v-5M3.5 17 8 14.2M3.5 7 8 9.8" opacity="0.65"/></svg>
+                  </div>
+                  <div class="s-info"><div style="display:flex;align-items:center;gap:7px;"><strong style="font-size:13px;">Tesseract</strong><span class="tag good">本地处理</span></div><div class="s-sub">开源多语言识别引擎</div></div>
+                  <button class="pill-btn" style="height:27px;font-size:11px;">启用</button>
+                </div>
+                <div class="provider-row">
+                  <div class="p-avatar" style="background:#2932e1;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="M9.154 0C7.71 0 6.54 1.658 6.54 3.707c0 2.051 1.171 3.71 2.615 3.71 1.446 0 2.614-1.659 2.614-3.71C11.768 1.658 10.6 0 9.154 0zm7.025.594C14.86.58 13.347 2.589 13.2 3.927c-.187 1.745.25 3.487 2.179 3.735 1.933.25 3.175-1.806 3.422-3.364.252-1.555-.995-3.364-2.362-3.674a1.218 1.218 0 0 0-.261-.03zM3.582 5.535a2.811 2.811 0 0 0-.156.008c-2.118.19-2.428 3.24-2.428 3.24-.287 1.41.686 4.425 3.297 3.864 2.617-.561 2.262-3.68 2.183-4.362-.125-1.018-1.292-2.773-2.896-2.75zm16.534 1.753c-2.308 0-2.617 2.119-2.617 3.616 0 1.43.121 3.425 2.988 3.362 2.867-.063 2.553-3.238 2.553-3.988 0-.745-.62-2.99-2.924-2.99zm-8.264 2.478c-1.424.014-2.708.925-3.323 1.947-1.118 1.868-2.863 3.05-3.112 3.363-.25.309-3.61 2.116-2.864 5.42.746 3.301 3.365 3.237 3.365 3.237s1.93.19 4.171-.31c2.24-.495 4.17.123 4.17.123s5.233 1.748 6.665-1.616c1.43-3.364-.808-5.109-.808-5.109s-2.99-2.306-4.736-4.798c-1.072-1.665-2.348-2.268-3.528-2.257zm-2.234 3.84l1.542.024v8.197H7.758c-1.47-.291-2.055-1.292-2.13-1.462-.072-.173-.488-.976-.268-2.343.635-2.049 2.447-2.196 2.447-2.196h1.81zm3.964 2.39v3.881c.096.413.612.488.612.488h1.614v-4.343h1.689v5.782h-3.915c-1.517-.39-1.59-1.465-1.59-1.465v-4.317zm-5.458 1.147c-.66.197-.978.708-1.05.928-.076.22-.247.78-.1 1.269.294 1.095 1.248 1.144 1.248 1.144h1.37v-3.34z"/></svg>
+                  </div>
+                  <div class="s-info"><div style="display:flex;align-items:center;gap:7px;"><strong style="font-size:13px;">百度 OCR</strong><span class="tag warn">未配置</span></div><div class="s-sub">云端识别</div></div>
+                  <button class="pill-btn" style="height:27px;font-size:11px;">配置</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="srv-p-tts" class="hidden">
+              <div class="group-header"><span class="group-title">系统语音合成（TTS）</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">语音</div></div><select class="select-ctrl"><option>系统默认</option><option>Tingting · zh-CN</option><option>Samantha · en-US</option></select></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">语速（字/分钟）</div></div><div class="range-wrap"><input type="range" min="80" max="400" step="10" value="180" oninput="this.nextElementSibling.textContent=this.value" /><span class="range-val">180</span></div></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">试听</div></div><button class="pill-btn primary" onclick="alert('正在朗读：SnapLingo 系统语音测试')">测试朗读</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PAGE 4: 通用设置 ── -->
+      <section class="main-pane hidden" id="page-general">
+        <header class="pane-topbar">
+          <div>
+            <div class="pane-title-row"><h1 class="pane-title">通用设置</h1><span class="save-pill">● 自动保存</span></div>
+            <p class="pane-desc">外观、启动项、权限、网络代理、数据容量与软件更新</p>
+          </div>
+          <div class="pane-tabs" data-panetabs="general">
+            <button class="pane-tab active" data-panel="gen-p-basic">常规与权限</button>
+            <button class="pane-tab" data-panel="gen-p-net">网络与维护</button>
+            <button class="pane-tab" data-panel="gen-p-about">实验与关于</button>
+          </div>
+        </header>
+        <div class="pane-scroll">
+          <div class="pane-inner">
+            <div id="gen-p-basic">
+              <div class="group-header"><span class="group-title">外观与启动</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">外观模式</div></div><div class="seg"><button class="active" onclick="setThemeMode('light', this)">浅色</button><button onclick="setThemeMode('dark', this)">深色</button><button onclick="segPick(this)">跟随系统</button></div></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">界面语言</div></div><select class="select-ctrl"><option>中文简体</option></select></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">开机自启</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              </div>
+              <div class="group-header"><span class="group-title">系统权限</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">屏幕录制</div><div class="s-sub">用于截图、像素放大镜与长截图</div></div><span class="tag good">已授权</span></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">辅助功能</div><div class="s-sub">用于划词取词与界面元素检测</div></div><span class="tag good">已授权</span></div>
+              </div>
+            </div>
+
+            <div id="gen-p-net" class="hidden">
+              <div class="group-header"><span class="group-title">网络代理与超时</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">代理设置</div></div><select class="select-ctrl"><option>跟随系统</option><option>不使用代理</option><option>手动代理</option></select></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">请求超时 / 失败重试</div></div><div style="display:flex;gap:8px;"><input class="input-ctrl" type="number" value="10000" style="width:98px;min-width:0;" /><input class="input-ctrl" type="number" value="1" style="width:68px;min-width:0;" /></div></div>
+              </div>
+              <div class="group-header"><span class="group-title">资料库容量与日志维护</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">自动清理历史记录</div><div class="s-sub">超过 30 天的非收藏记录自动删除（历史 128/5000 · 收藏 24/1000）</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">日志级别 & 保留天数</div></div><div style="display:flex;gap:8px;"><select class="select-ctrl" style="min-width:94px;"><option>Info</option><option>Debug</option><option>Warn</option></select><input class="input-ctrl" type="number" value="7" style="width:72px;min-width:0;" /></div></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">数据维护</div></div><div style="display:flex;gap:8px;"><button class="pill-btn">刷新日志</button><button class="pill-btn danger">清空日志</button><button class="pill-btn danger">清空历史</button></div></div>
+              </div>
+            </div>
+
+            <div id="gen-p-about" class="hidden">
+              <div class="group-header"><span class="group-title">实验性功能</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">GPU 合成加速</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+                <div class="s-row"><div class="s-info"><div class="s-label">性能监控</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+              </div>
+              <div class="group-header"><span class="group-title">关于 SnapLingo</span></div>
+              <div class="s-card">
+                <div class="s-row"><div class="s-info"><div class="s-label">当前版本 v0.1.33</div><div class="s-sub">MIT License · 第三方组件许可声明</div></div><div style="display:flex;gap:8px;"><button class="pill-btn">许可声明</button><button class="pill-btn primary">检查更新</button></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PAGE 5: 资料库 ── -->
+      <section class="main-pane hidden" id="page-library">
+        <header class="pane-topbar">
+          <div><h1 class="pane-title">资料库</h1><p class="pane-desc">历史记录与个人收藏统一检索</p></div>
+          <div class="seg" id="lib-mode-seg"><button class="active" data-mode="all">历史记录</button><button data-mode="fav">★ 收藏夹</button></div>
+        </header>
+        <div class="library-split">
+          <div class="lib-col">
+            <div style="padding:12px;border-bottom:1px solid var(--border);background:var(--win-bg);display:flex;flex-direction:column;gap:8px;">
+              <input id="lib-search" class="input-ctrl" style="width:100%;" placeholder="搜索原文、译文、标签或备注..." />
+              <div class="seg" id="lib-kind-seg" style="width:100%;justify-content:space-between;">
+                <button class="active" data-kind="all">全部</button><button data-kind="translation">翻译</button><button data-kind="ocr">OCR</button><button data-kind="screenshot">截图</button>
+              </div>
+            </div>
+            <div class="lib-list" id="lib-list"></div>
+          </div>
+          <div style="padding:22px 26px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;" id="lib-detail"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ═══════════════ 2. 截图编辑器（保持原版工具栏 + 保留颜色/粗细快捷栏） ═══════════════ -->
+    <div class="capture-stage hidden" id="scene-capture">
+      <div class="capture-desktop-dim"></div>
+
+      <div class="capture-board-wrap">
+        <div class="capture-size-badge">960 × 600 px</div>
+        <canvas id="capture-canvas" width="960" height="600"></canvas>
+        <div class="sel-dot" style="left:-4px;top:-4px;"></div>
+        <div class="sel-dot" style="right:-4px;top:-4px;"></div>
+        <div class="sel-dot" style="left:-4px;bottom:-4px;"></div>
+        <div class="sel-dot" style="right:-4px;bottom:-4px;"></div>
+      </div>
+
+      <div class="orig-toolbar-stack">
+        <!-- 1:1 还原 captureEditorToolbar.tsx 原版图标、按钮顺序与文字按钮 -->
+        <div class="orig-capture-toolbar" role="toolbar" aria-label="截图工具栏">
+          <button class="ot-btn" data-tool="select" title="选择/移动">
+            <svg viewBox="0 0 24 24"><path d="M6.5 4.5v14.3l3.65-3.8 2.55 5 2.25-1.15-2.5-4.85h5.25L6.5 4.5Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.65"/></svg>
+          </button>
+          <button class="ot-btn active" data-tool="rectangle" title="形状：矩形 / 椭圆 (B/O)">
+            <svg viewBox="0 0 24 24"><rect x="4.5" y="5.5" width="10.5" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.65"/><ellipse cx="15.4" cy="14.6" rx="4.7" ry="3.8" fill="none" stroke="currentColor" stroke-width="1.65"/></svg>
+            <svg class="chev" viewBox="0 0 24 24"><path d="m7.5 9.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.65"/></svg>
+          </button>
+          <button class="ot-btn" data-tool="arrow" title="箭头 / 直线 (A/L)">
+            <svg viewBox="0 0 24 24"><path d="m5.5 18.5 13-13M11.8 5.5h6.7v6.7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.65"/></svg>
+            <svg class="chev" viewBox="0 0 24 24"><path d="m7.5 9.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.65"/></svg>
+          </button>
+          <button class="ot-btn" data-tool="mosaic" title="马赛克 / 模糊 (M/U)">
+            <svg viewBox="0 0 24 24"><rect x="4.5" y="4.5" width="15" height="15" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.65"/><path d="M9.5 4.5v15M14.5 4.5v15M4.5 9.5h15M4.5 14.5h15" fill="none" stroke="currentColor" stroke-width="1.65" opacity="0.55"/><path d="M4.5 4.5h5v5h-5zM14.5 4.5h5v5h-5zM9.5 9.5h5v5h-5zM4.5 14.5h5v5h-5zM14.5 14.5h5v5h-5z" fill="currentColor"/></svg>
+            <svg class="chev" viewBox="0 0 24 24"><path d="m7.5 9.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.65"/></svg>
+          </button>
+          <button class="ot-btn" data-tool="pen" title="画笔 (P)">
+            <svg viewBox="0 0 24 24"><path d="m5 19 1.15-4.45 9.15-9.15 3.3 3.3-9.15 9.15L5 19Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.65"/><path d="m13.9 6.8 3.3 3.3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.65"/><path d="m5 19 4.45-1.15-3.3-3.3L5 19Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.65"/></svg>
+          </button>
+          <button class="ot-btn" data-tool="text" title="文字 (T)">
+            <svg viewBox="0 0 24 24"><path d="M6.5 5.5h11M12 5.5v13M8.8 18.5h6.4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.65"/></svg>
+          </button>
+          <button class="ot-btn" data-tool="eraser" title="橡皮擦 (E)">
+            <svg viewBox="0 0 24 24"><path d="m5 15.2 8.7-8.7 4.8 4.8-7.2 7.2H8.2L5 15.2Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.65"/><path d="m10.1 10.1 4.8 4.8M11.3 18.5h7.2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.65"/></svg>
+          </button>
+          <button class="ot-btn" data-tool="highlighter" title="荧光笔 (H)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m6 14 8-8 4 4-8 8-4-4Z"/><path d="m4 20 3-4 3 3-4 3"/></svg>
+          </button>
+          <div class="ot-div"></div>
+          <button class="ot-btn" id="cap-undo" title="撤销 (⌘Z)">
+            <svg viewBox="0 0 24 24"><path d="M8.5 7.5H5V4M5.4 7.2a7.5 7.5 0 1 1-.1 9.8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.65"/></svg>
+          </button>
+          <button class="ot-btn" id="cap-redo" title="重做 (⌘⇧Z)">
+            <svg viewBox="0 0 24 24"><path d="M15.5 7.5H19V4M18.6 7.2a7.5 7.5 0 1 0 .1 9.8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.65"/></svg>
+          </button>
+          <div class="ot-div"></div>
+          <button class="ot-btn" onclick="alert('取消截图 (Esc)')" style="padding:0 7px;">ESC</button>
+          <button class="ot-btn" onclick="alert('标注属性：圆角 / 字体 / 模糊强度')" title="标注属性">···</button>
+          <button class="ot-btn" onclick="alert('OCR 识别')" style="padding:0 7px;">OCR</button>
+          <button class="ot-btn" onclick="alert('启动长截图 (S)')" style="padding:0 7px;">长截图</button>
+          <button class="ot-btn" id="cap-clear-btn" style="padding:0 7px;">清空</button>
+          <button class="ot-btn" onclick="alert('加入收藏夹')" title="收藏">
+            <svg viewBox="0 0 24 24"><path d="M6.2 4.5h11.6v15l-5.8-3.4-5.8 3.4v-15Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.65"/><path d="m12 7.2 1.1 2.2 2.4.3-1.7 1.7.4 2.4-2.2-1.1-2.2 1.1.4-2.4-1.7-1.7 2.4-.3L12 7.2Z" fill="currentColor"/></svg>
+          </button>
+          <button class="ot-btn" onclick="alert('贴图 (F3 / ⌘T)')" title="贴图 (F3)">
+            <svg viewBox="0 0 24 24"><path d="m14.3 3.4 6.3 6.3-2 2-1.6-1.6-3.2 3.2.7 2.7-1.4 1.4-3.6-3.6-5.2 5.2-1-1 5.2-5.2-3.6-3.6 1.4-1.4 2.7.7 3.2-3.2-1.6-1.6 2-2Z" fill="currentColor"/></svg>
+          </button>
+          <button class="ot-btn" id="cap-save" title="保存 (⌘S)">
+            <svg viewBox="0 0 24 24"><path d="M12 4.5v10M8.5 11l3.5 3.5 3.5-3.5M5 19h14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.65"/></svg>
+          </button>
+          <button class="ot-btn" id="cap-copy" title="复制 (⌘C / Enter)" style="background:#2563eb;color:#fff;width:28px;padding:0;">
+            <svg viewBox="0 0 24 24"><rect x="8" y="7.5" width="11.5" height="12" rx="2" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.65"/><path d="M15.5 7.5V6A1.8 1.8 0 0 0 13.7 4.2H6A1.8 1.8 0 0 0 4.2 6v8A1.8 1.8 0 0 0 6 15.8h2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.65"/></svg>
+          </button>
+        </div>
+
+        <!-- 留用的矩形/工具颜色、粗细与填充快捷条 -->
+        <div class="quick-prop-bar">
+          <span id="qp-tool-name" style="font-weight:600;color:#2563eb;">矩形</span>
+          <div class="ot-div"></div>
+          <div style="display:flex;align-items:center;gap:5px;" id="qp-colors">
+            <button class="qp-dot active" data-color="#ef4444" style="background:#ef4444;"></button>
+            <button class="qp-dot" data-color="#f59e0b" style="background:#f59e0b;"></button>
+            <button class="qp-dot" data-color="#10b981" style="background:#10b981;"></button>
+            <button class="qp-dot" data-color="#3b82f6" style="background:#3b82f6;"></button>
+            <button class="qp-dot" data-color="#1e293b" style="background:#1e293b;"></button>
+          </div>
+          <div class="ot-div"></div>
+          <label style="display:flex;align-items:center;gap:6px;">
+            <span>粗细</span>
+            <input type="range" id="cap-width" min="1" max="16" value="4" style="width:76px;accent-color:#2563eb;" />
+            <span id="cap-width-val" style="font-family:var(--font-mono);min-width:26px;">4px</span>
+          </label>
+          <div class="ot-div"></div>
+          <button class="ot-btn" id="cap-fill-btn" style="height:24px;font-size:11px;border:1px solid var(--border-strong);">边框模式</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ 3. 重新设计的桌面贴图场景（全部控制统一放在图片下方，零遮挡） ═══════════════ -->
+    <div class="pin-desktop-canvas hidden" id="scene-pin">
+      <div class="pin-stage-col">
+        <div class="pin-window-shell" id="pin-shell">
+          <div class="pin-frame" id="pin-frame">
+            <div style="padding:48px 30px 44px;color:#354337;font-family:Georgia,serif;">
+              <div style="font-family:var(--font-sans);font-size:10px;letter-spacing:0.2em;color:#707865;margin-bottom:10px;">NOTES ON DESIGN · № 10</div>
+              <div style="font-size:40px;line-height:1.1;font-weight:700;">Less,<br/><span style="font-style:italic;font-weight:400;">but better.</span></div>
+              <div style="font-size:14px;color:#525e51;margin-top:12px;">Good design is as little design as possible.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 统一放在图片正下方的轻量化控制条（与截图工具栏交互一致，绝不挡图） -->
+        <div class="pin-bottom-dock" role="toolbar" aria-label="贴图工具栏">
+          <button class="pin-tbtn" id="pin-btn-border" title="显示/隐藏边框 (B)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5"/></svg>
+          </button>
+          <button class="pin-tbtn" id="pin-btn-gray" title="灰度显示 (5)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/><path d="M12 8h6.9M12 12h8M12 16h6.9" opacity="0.55"/></svg>
+          </button>
+          <button class="pin-tbtn" id="pin-btn-inv" title="反色显示 (6)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor"/></svg>
+          </button>
+          <div class="pin-tsep"></div>
+          <div class="pin-slider-group">
+            <span>缩放</span>
+            <input type="range" class="thin-range" id="pin-zoom" min="70" max="120" value="100" />
+            <span class="pin-slider-val" id="pin-zoom-val">100%</span>
+          </div>
+          <div class="pin-slider-group">
+            <span>透明</span>
+            <input type="range" class="thin-range" id="pin-opacity" min="25" max="100" value="100" />
+            <span class="pin-slider-val" id="pin-opacity-val">100%</span>
+          </div>
+          <button class="pin-tbtn" id="pin-btn-reset" title="重置缩放与透明度 (中键)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.35-5.65L4 8.7"/><path d="M4 4v4.7h4.7"/></svg>
+          </button>
+          <div class="pin-tsep"></div>
+          <button class="pin-tbtn" onclick="alert('已复制贴图（导出当前尺寸，不含边框与透明度）')" title="复制 (⌘C)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="pin-tbtn" onclick="alert('已保存贴图 PNG')" title="保存 (⌘S)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v10M8.5 11l3.5 3.5 3.5-3.5M5 19h14"/></svg>
+          </button>
+          <button class="pin-tbtn danger" onclick="alert('关闭当前贴图 (双击 / Esc)')" title="关闭 (Esc)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 右侧：贴图右键菜单预览 -->
+      <div class="pin-inspector-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <strong style="font-size:13px;">右键菜单与快捷操作</strong>
+          <span class="tag accent">置顶</span>
+        </div>
+        <div class="pin-menu-preview">
+          <button class="pin-menu-row" onclick="document.getElementById('pin-btn-reset').click()"><span>重置大小与透明度</span><kbd>中键</kbd></button>
+          <button class="pin-menu-row" onclick="document.getElementById('pin-btn-border').click()"><span>切换边框</span><kbd>B</kbd></button>
+          <button class="pin-menu-row" onclick="document.getElementById('pin-btn-gray').click()"><span>灰度 / 反色</span><kbd>5 / 6</kbd></button>
+          <button class="pin-menu-row"><span>缩略图模式</span><kbd>⇧双击</kbd></button>
+          <div class="pin-menu-sep"></div>
+          <button class="pin-menu-row"><span>移到另一贴图组</span><kbd>⌘F3</kbd></button>
+          <button class="pin-menu-row"><span>隐藏全部贴图</span><kbd>⇧F3</kbd></button>
+          <div class="pin-menu-sep"></div>
+          <button class="pin-menu-row"><span>复制图像</span><kbd>⌘C</kbd></button>
+          <button class="pin-menu-row"><span>另存为 / 快速保存 PNG</span><kbd>⌘S</kbd></button>
+          <div class="pin-menu-sep"></div>
+          <button class="pin-menu-row danger"><span>关闭当前贴图</span><kbd>双击</kbd></button>
+          <button class="pin-menu-row danger"><span>关闭全部贴图</span><kbd></kbd></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ 4. 翻译浮窗（严格沿用原版 Crisp SVG 图标） ═══════════════ -->
+    <div class="hidden" id="scene-translate">
+      <div class="result-window">
+        <div class="rw-header">
+          <button class="rw-icon-btn" id="rw-pin-btn" title="固定窗口">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v4l4 4v2H6v-2l4-4V4"/><path d="M9 4h6"/><path d="M12 14v7"/></svg>
+          </button>
+          <div style="display:flex;align-items:center;gap:9px;flex:1;justify-content:center;">
+            <strong style="font-size:15px;">翻译</strong>
+            <span style="font-size:12px;color:var(--muted);font-weight:500;">划词取词 · 2 个服务</span>
+          </div>
+          <button class="rw-icon-btn" title="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+          <div class="rw-source-box" style="padding:0;overflow:hidden;">
+            <textarea rows="3" style="width:100%;border:none;background:var(--surface);resize:none;outline:none;font-size:13.5px;line-height:1.55;padding:10px 12px;display:block;">Good design is as little design as possible. Less, but better — because it concentrates on the essential aspects.</textarea>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-top:1px solid var(--border);background:var(--surface-subtle);">
+              <span style="font-size:11px;color:var(--faint);">111 chars · 识别为 <strong style="color:var(--accent);">English</strong></span>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button style="height:26px;padding:0 6px;border-radius:6px;font-size:11px;font-weight:600;color:var(--muted);">折叠</button>
+                <button class="rw-action-chip" title="收藏" onclick="this.classList.toggle('fav-active')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.75 5.57 6.15.9-4.45 4.33 1.05 6.12L12 17.03l-5.5 2.89 1.05-6.12L3.1 9.47l6.15-.9L12 3Z"/></svg></button>
+                <button class="rw-action-chip" title="复制" onclick="alert('已复制原文')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+                <button class="rw-action-chip" title="朗读"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M16 9.5a4 4 0 0 1 0 5"/><path d="M19 7a8 8 0 0 1 0 10"/></svg></button>
+                <button class="rw-action-chip" title="重试"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.35-5.65L4 8.7"/><path d="M4 4v4.7h4.7"/></svg></button>
+                <button class="rw-action-chip" title="清空"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h10"/><path d="M5 12h7"/><path d="M5 17h6"/><path d="m16 10 4 4"/><path d="m20 10-4 4"/></svg></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="lang-bar">
+            <button>自动检测</button>
+            <button title="切换语言" style="color:var(--muted);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12"/><path d="m15 4 3 3-3 3"/><path d="M18 17H6"/><path d="m9 14-3 3 3 3"/></svg>
+            </button>
+            <button>简体中文</button>
+          </div>
+
+          <div class="rw-result-card" style="padding:0;overflow:hidden;background:var(--surface);">
+            <div class="rw-card-head">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="rw-provider-icon" title="Google 翻译">
+                  <svg viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                </span>
+                <span style="font-size:13px;font-weight:600;color:var(--ink);">Google 翻译</span>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <button class="rw-action-chip" title="重试"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.35-5.65L4 8.7"/><path d="M4 4v4.7h4.7"/></svg></button>
+                <button class="rw-action-chip" title="朗读"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M16 9.5a4 4 0 0 1 0 5"/><path d="M19 7a8 8 0 0 1 0 10"/></svg></button>
+                <button class="rw-action-chip" title="收藏" onclick="this.classList.toggle('fav-active')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.75 5.57 6.15.9-4.45 4.33 1.05 6.12L12 17.03l-5.5 2.89 1.05-6.12L3.1 9.47l6.15-.9L12 3Z"/></svg></button>
+                <button class="rw-action-chip" title="复制" onclick="alert('已复制译文')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+                <button class="rw-action-chip" title="收起"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></button>
+              </div>
+            </div>
+            <div style="padding:10px 12px;font-size:13.5px;line-height:1.5;">好的设计是尽可能少的设计。更少，却更好——因为它专注于本质。</div>
+          </div>
+
+          <div class="rw-result-card" style="padding:0;overflow:hidden;background:var(--surface);">
+            <div class="rw-card-head">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="rw-provider-icon" style="background:#0F2B46;border-color:#0F2B46;" title="DeepL / DeepLX">
+                  <svg viewBox="0 0 24 24" fill="#ffffff"><path d="M20.907 4.93953 12.68543.18573a1.3577 1.3577 0 0 0-1.3709 0L3.09298 4.9565a1.3766 1.3766 0 0 0-.68639 1.18233v9.52646a1.3766 1.3766 0 0 0 .68639 1.19363l8.22157 4.75946.06223.03583 4.04856 2.3458-.01131-2.06106.0075-1.1446.0038.01885v-.38467c0-.23006.1188-.43371.29605-.56005l.264-.15086.12633-.06977h-.0075l4.80283-2.7795a1.3803 1.3803 0 0 0 .68639-1.19551V6.13505a1.3803 1.3803 0 0 0-.68642-1.19552m-9.85269 9.68863a1.4275 1.4275 0 0 1-.39976 1.3841 1.4086 1.4086 0 0 1-1.97054 0 1.4199 1.4199 0 0 1 0-2.06294 1.4086 1.4086 0 0 1 2.0422.07543l3.32822-1.91585.6864.38656zm5.77019-2.41367a1.4086 1.4086 0 0 1-1.97054 0 1.4256 1.4256 0 0 1-.3696-1.47837l-.0132.0075-3.7525-2.1723-.05657.05656a1.4086 1.4086 0 0 1-1.97053 0 1.4199 1.4199 0 0 1 0-2.06293 1.4086 1.4086 0 0 1 1.97242 0c.3941.37713.52422.91832.39033 1.40672l3.7808 2.20059.01886-.01886a1.4086 1.4086 0 0 1 1.97242 0 1.42746 1.42746 0 0 1 0 2.06105z"/></svg>
+                </span>
+                <span style="font-size:13px;font-weight:600;color:var(--ink);">DeepLX</span>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <button class="rw-action-chip" title="重试"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.35-5.65L4 8.7"/><path d="M4 4v4.7h4.7"/></svg></button>
+                <button class="rw-action-chip" title="朗读"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M16 9.5a4 4 0 0 1 0 5"/><path d="M19 7a8 8 0 0 1 0 10"/></svg></button>
+                <button class="rw-action-chip" title="收藏" onclick="this.classList.toggle('fav-active')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.75 5.57 6.15.9-4.45 4.33 1.05 6.12L12 17.03l-5.5 2.89 1.05-6.12L3.1 9.47l6.15-.9L12 3Z"/></svg></button>
+                <button class="rw-action-chip" title="复制" onclick="alert('已复制译文')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+                <button class="rw-action-chip" title="收起"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></button>
+              </div>
+            </div>
+            <div style="padding:10px 12px;font-size:13.5px;line-height:1.5;">好的设计是尽可能少的设计。少即是多——因为它聚焦于核心要素。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ 5. 重新设计的 OCR 浮窗（与翻译浮窗统一语言，包含分词快拷、引擎状态与原图对比） ═══════════════ -->
+    <div class="hidden" id="scene-ocr">
+      <div class="ocr-window">
+        <div class="rw-header">
+          <button class="rw-icon-btn" title="固定窗口" onclick="this.classList.toggle('pinned')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v4l4 4v2H6v-2l4-4V4"/><path d="M9 4h6"/><path d="M12 14v7"/></svg>
+          </button>
+          <div style="display:flex;align-items:center;gap:8px;flex:1;justify-content:center;">
+            <strong style="font-size:15px;">OCR</strong>
+            <span class="tag good" style="display:inline-flex;align-items:center;gap:4px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+              Apple Vision
+            </span>
+            <span style="font-size:11.5px;color:var(--muted);font-weight:500;">English · 置信度 98.4%</span>
+          </div>
+          <button class="rw-icon-btn" title="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="ocr-body-wrap">
+          <div class="ocr-split-grid">
+            <!-- 左侧：原图卡片 + 替换图片 -->
+            <div class="ocr-img-card">
+              <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;">
+                <strong style="color:var(--ink-2);">识别原图</strong>
+                <span style="color:var(--faint);font-family:var(--font-mono);">960×600</span>
+              </div>
+              <div class="ocr-img-preview">
+                <div style="font-family:var(--font-sans);font-size:9px;letter-spacing:0.18em;color:#707865;margin-bottom:6px;">NOTES ON DESIGN</div>
+                <div style="font-size:21px;font-weight:700;line-height:1.15;">Less,<br/><span style="font-style:italic;font-weight:400;">but better.</span></div>
+                <div style="font-size:11px;color:#525e51;margin-top:8px;">Good design is as little design as possible.</div>
+              </div>
+              <button class="pill-btn" style="justify-content:center;width:100%;" onclick="alert('打开文件选择器重新识别图片')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M20 16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3"/></svg>
+                上传图片 OCR
+              </button>
+            </div>
+
+            <!-- 右侧：识别文本 + 推荐复制片段 + 原版底部操作条 -->
+            <div class="ocr-text-card">
+              <div class="rw-card-head">
+                <span style="font-size:12px;font-weight:600;color:var(--ink-2);">识别结果</span>
+                <button class="pill-btn primary" style="height:24px;padding:0 10px;font-size:11px;" onclick="alert('带入识别文本并跳转到翻译浮窗')">一键翻译 →</button>
+              </div>
+              <textarea style="flex:1;width:100%;border:none;background:var(--surface);padding:12px 14px;font-size:13.5px;line-height:1.6;resize:none;outline:none;">Less, but better.
+Good design is as little design as possible.
+Dieter Rams · Ten principles for good design</textarea>
+
+              <div class="ocr-tokens-strip">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);">
+                  <strong style="font-weight:600;">推荐复制片段</strong>
+                  <span style="color:var(--faint);">点击即复制</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                  <button class="ocr-token-chip" onclick="alert('已复制：Less, but better.')"><span>标题</span>Less, but better.</button>
+                  <button class="ocr-token-chip" onclick="alert('已复制：Dieter Rams')"><span>短语</span>Dieter Rams</button>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-top:1px solid var(--border);background:var(--surface-subtle);">
+                <span style="font-size:11px;color:var(--faint);">3 行 · 108 chars</span>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <button class="rw-action-chip" title="朗读"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M16 9.5a4 4 0 0 1 0 5"/><path d="M19 7a8 8 0 0 1 0 10"/></svg></button>
+                  <button class="rw-action-chip" title="收藏" onclick="this.classList.toggle('fav-active')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.75 5.57 6.15.9-4.45 4.33 1.05 6.12L12 17.03l-5.5 2.89 1.05-6.12L3.1 9.47l6.15-.9L12 3Z"/></svg></button>
+                  <button class="rw-action-chip" title="复制" onclick="alert('已复制识别文本')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+                  <button class="rw-action-chip" title="清空"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h10"/><path d="M5 12h7"/><path d="M5 17h6"/><path d="m16 10 4 4"/><path d="m20 10-4 4"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // ── Theme & Helpers ───────────────────────────────────────────
+    const root = document.documentElement;
+    const btnTheme = document.getElementById('btn-theme');
+    function setThemeMode(mode, btn) {
+      root.setAttribute('data-theme', mode);
+      btnTheme.textContent = mode === 'dark' ? '切换浅色' : '切换深色';
+      if (btn) segPick(btn);
+    }
+    btnTheme.addEventListener('click', () => setThemeMode(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+    window.segPick = el => {
+      el.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+    };
+    window.pickSwatch = el => {
+      el.parentElement.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      el.classList.add('active');
+    };
+    window.scrollToEl = (id, btn) => {
+      const target = document.getElementById(id);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (btn) {
+        btn.parentElement.querySelectorAll('.toc-link').forEach(l => l.classList.remove('active'));
+        btn.classList.add('active');
+      }
+    };
+
+    // ── Header Sub-tabs Switching ─────────────────────────────────
+    document.querySelectorAll('[data-panetabs]').forEach(group => {
+      group.querySelectorAll('.pane-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          group.querySelectorAll('.pane-tab').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const target = btn.dataset.panel;
+          group.querySelectorAll('.pane-tab').forEach(b => {
+            const p = document.getElementById(b.dataset.panel);
+            if (p) p.classList.toggle('hidden', b.dataset.panel !== target);
+          });
+        });
+      });
+    });
+
+    // ── Hotkeys (Original Style) ──────────────────────────────────
+    const hotkeys = {
+      screenshot: [
+        { label: '截屏', desc: '框选屏幕区域进行标注、长截图或贴图', val: 'F1', def: 'F1' },
+        { label: '截屏并自动复制', desc: '确认选区后直接复制到剪贴板', val: '⌘F1', def: '⌘F1' },
+        { label: '贴图', desc: '置顶显示选区或剪贴板中的图片', val: 'F3', def: 'F3' },
+        { label: '隐藏 / 显示所有贴图', desc: '', val: '⇧F3', def: '⇧F3' },
+        { label: '切换到另一贴图组', desc: '', val: '⌘F3', def: '⌘F3' },
+      ],
+      translation: [
+        { label: '划词翻译', desc: '选中文字后呼出翻译浮窗', val: '⌥D', def: '⌥D' },
+        { label: '截图翻译', desc: '框选屏幕区域并识别翻译', val: '⌥S', def: '⌥S' },
+        { label: '显示翻译窗口', desc: '打开翻译浮窗手动输入', val: '⌥A', def: '⌥A' },
+      ],
+      ocr: [
+        { label: '截图 OCR', desc: '识别选区文字并打开结果窗口', val: '⇧⌥S', def: '⇧⌥S' },
+        { label: '静默截图 OCR', desc: '后台识别并直接写入剪贴板', val: '未设置', def: '未设置' },
+        { label: '上传图片 OCR', desc: '从本地文件选择图片识别', val: '未设置', def: '未设置' },
+      ],
+    };
+    function renderHotkeys() {
+      Object.entries(hotkeys).forEach(([cat, list]) => {
+        const el = document.getElementById(`hk-${cat}`);
+        if (!el) return;
+        el.innerHTML = list.map((item, idx) => {
+          const unset = item.val === '未设置';
+          const mods = ['⇧', '⌥', '⌘', '⌃'].map(m => `<span class="hk-mod ${!unset && item.val.includes(m) ? 'active' : ''}">${m}</span>`).join('');
+          const key = item.val.replace(/[⇧⌥⌘⌃]/g, '').trim();
+          const modChanged = item.val !== item.def;
+          return `
+            <div class="hotkey-row">
+              <div class="s-info"><div class="s-label">${item.label}</div>${item.desc ? `<div class="s-sub">${item.desc}</div>` : ''}</div>
+              <div class="hotkey-controls">
+                <button class="hotkey-display ${unset ? 'unset' : ''}" onclick="recordHk(this)">
+                  ${mods}${unset ? '<span class="hk-ph">未设置</span>' : `<span class="hk-key">${key}</span>`}
+                </button>
+                <button class="hk-btn" ${modChanged ? '' : 'disabled'} title="恢复默认" onclick="resetHk('${cat}',${idx})">↺</button>
+                <button class="hk-btn del" ${unset ? 'disabled' : ''} title="清除" onclick="clearHk('${cat}',${idx})">✕</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      });
+    }
+    window.recordHk = btn => {
+      const on = btn.classList.toggle('recording');
+      if (on) { btn.dataset.prev = btn.innerHTML; btn.innerHTML = `<span class="hk-mod">⇧</span><span class="hk-mod">⌥</span><span class="hk-mod">⌘</span><span class="hk-mod">⌃</span><span class="hk-ph" style="color:var(--accent);">按下快捷键...</span>`; }
+      else if (btn.dataset.prev) btn.innerHTML = btn.dataset.prev;
+    };
+    window.clearHk = (c, i) => { hotkeys[c][i].val = '未设置'; renderHotkeys(); };
+    window.resetHk = (c, i) => { hotkeys[c][i].val = hotkeys[c][i].def; renderHotkeys(); };
+    renderHotkeys();
+
+    // ── Scene & Page Navigation ───────────────────────────────────
+    const sceneTabs = document.querySelectorAll('.scene-tab');
+    const settingsWin = document.getElementById('scene-settings-window');
+    const scenesMap = {
+      capture: document.getElementById('scene-capture'),
+      pin: document.getElementById('scene-pin'),
+      translate: document.getElementById('scene-translate'),
+      ocr: document.getElementById('scene-ocr'),
+    };
+    const navItems = document.querySelectorAll('.nav-item');
+    const pages = ['overview', 'screenshot', 'translation', 'services', 'general', 'library'];
+    function switchPage(key) {
+      navItems.forEach(n => n.classList.toggle('active', n.dataset.page === key));
+      pages.forEach(p => document.getElementById(`page-${p}`).classList.toggle('hidden', p !== key));
+    }
+    navItems.forEach(n => n.addEventListener('click', () => {
+      switchPage(n.dataset.page);
+      sceneTabs.forEach(t => t.classList.toggle('active', n.dataset.page === 'library' ? t.dataset.scene === 'library' : t.dataset.scene === 'settings'));
+    }));
+    sceneTabs.forEach(t => t.addEventListener('click', () => {
+      sceneTabs.forEach(x => x.classList.remove('active')); t.classList.add('active');
+      Object.values(scenesMap).forEach(el => el.classList.add('hidden'));
+      const s = t.dataset.scene;
+      if (s === 'settings' || s === 'library') {
+        settingsWin.classList.remove('hidden');
+        switchPage(s === 'library' ? 'library' : 'overview');
+      } else {
+        settingsWin.classList.add('hidden');
+        scenesMap[s].classList.remove('hidden');
+      }
+    }));
+
+    // ── Library Demo ──────────────────────────────────────────────
+    const libData = [
+      { id: 1, kind: 'translation', label: '翻译', fav: true, time: '刚刚', source: 'Good design is as little design as possible. Less, but better.', result: '好的设计是尽可能少的设计。更少，却更好。', provider: 'Google 翻译', note: 'Dieter Rams 设计原则' },
+      { id: 2, kind: 'ocr', label: 'OCR', fav: false, time: '12 分钟前', source: 'Ten principles for good design', result: 'Ten principles for good design', provider: 'Apple Vision', note: '' },
+      { id: 3, kind: 'screenshot', label: '截图', fav: true, time: '昨天 18:42', source: '960 × 600 px · PNG', result: '~/Pictures/SnapLingo/2026-11-28.png', provider: '截图编辑器', note: '评审摘录' },
+    ];
+    let libMode = 'all', libKind = 'all', libQ = '', selId = 1;
+    function renderLib() {
+      const items = libData.filter(i => (libMode === 'all' || i.fav) && (libKind === 'all' || i.kind === libKind) && (!libQ || (i.source + i.result + i.note).toLowerCase().includes(libQ.toLowerCase())));
+      document.getElementById('lib-list').innerHTML = items.map(i => `
+        <button class="lib-item ${i.id === selId ? 'active' : ''}" onclick="selLib(${i.id})">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin-bottom:3px;">
+            <span class="tag ${i.kind==='ocr'?'good':i.kind==='screenshot'?'warn':'accent'}">${i.label}</span><span>${i.fav?'★ ':''}${i.time}</span>
+          </div>
+          <div style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${i.source}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${i.result}</div>
+        </button>
+      `).join('') || '<div style="padding:24px;text-align:center;font-size:12px;color:var(--faint);">暂无记录</div>';
+      const cur = items.find(i => i.id === selId) || items[0];
+      const d = document.getElementById('lib-detail');
+      if (!cur) { d.innerHTML = ''; return; }
+      selId = cur.id;
+      d.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div><span class="tag">${cur.provider}</span> <span style="font-size:12px;color:var(--faint);margin-left:6px;">${cur.time}</span></div>
+          <div style="display:flex;gap:8px;"><button class="pill-btn" onclick="toggleLibFav(${cur.id})">${cur.fav?'★ 已收藏':'☆ 收藏'}</button><button class="pill-btn primary" onclick="alert('已复制')">复制</button></div>
+        </div>
+        <div class="s-card" style="padding:14px;"><div style="font-size:11px;color:var(--faint);margin-bottom:4px;">原文 / 来源</div><div style="font-size:13.5px;line-height:1.6;">${cur.source}</div></div>
+        <div class="s-card" style="padding:14px;"><div style="font-size:11px;color:var(--faint);margin-bottom:4px;">结果</div><div style="font-size:14px;line-height:1.6;font-weight:500;">${cur.result}</div></div>
+        <div class="s-card" style="padding:14px;"><div style="font-size:11px;color:var(--faint);margin-bottom:6px;">备注</div><input class="input-ctrl" style="width:100%;" value="${cur.note}" placeholder="添加个人备注..." /></div>
+      `;
+    }
+    window.selLib = id => { selId = id; renderLib(); };
+    window.toggleLibFav = id => { const x = libData.find(i => i.id === id); if (x) x.fav = !x.fav; renderLib(); };
+    document.querySelectorAll('#lib-mode-seg button').forEach(b => b.addEventListener('click', () => { segPick(b); libMode = b.dataset.mode; renderLib(); }));
+    document.querySelectorAll('#lib-kind-seg button').forEach(b => b.addEventListener('click', () => { segPick(b); libKind = b.dataset.kind; renderLib(); }));
+    document.getElementById('lib-search').addEventListener('input', e => { libQ = e.target.value; renderLib(); });
+    renderLib();
+
+    // ── Capture Editor Canvas (Original Bar + Retained Color/Stroke Bar) ──
+    const canvas = document.getElementById('capture-canvas');
+    const ctx = canvas.getContext('2d');
+    let capTool = 'rectangle', capColor = '#ef4444', capWidth = 4, capFill = false;
+    let capHistory = [[], [{ tool: 'rectangle', x: 64, y: 150, x2: 520, y2: 342, color: '#ef4444', width: 4, fill: false }]];
+    let capIdx = 1, capDraft = null;
+    const toolNames = { select: '选择', rectangle: '矩形', arrow: '箭头', mosaic: '马赛克', pen: '画笔', text: '文字', eraser: '橡皮擦', highlighter: '荧光笔' };
+
+    function paintCap(list) {
+      ctx.fillStyle = '#f4f1e7'; ctx.fillRect(0, 0, 960, 600);
+      ctx.fillStyle = '#707865'; ctx.font = '12px -apple-system, sans-serif';
+      ctx.fillText('N O T E S  O N  D E S I G N', 72, 66); ctx.fillText('№ 10', 845, 66);
+      ctx.fillStyle = '#d1d2c3'; ctx.fillRect(72, 94, 816, 1);
+      ctx.fillStyle = '#4a6150'; ctx.fillRect(74, 136, 32, 3);
+      ctx.font = '80px Georgia, serif'; ctx.fillStyle = '#354337'; ctx.fillText('Less,', 72, 232);
+      ctx.font = 'italic 80px Georgia, serif'; ctx.fillText('but better.', 70, 324);
+      ctx.font = '20px Georgia, serif'; ctx.fillStyle = '#525e51'; ctx.fillText('Good design is as little design as possible.', 74, 384);
+      ctx.font = '16px Georgia, serif'; ctx.fillStyle = '#818475'; ctx.fillText('It concentrates on the essential aspects, and is not burdened with non-essentials.', 74, 424);
+      ctx.fillStyle = '#d1d2c3'; ctx.fillRect(72, 520, 816, 1);
+      ctx.font = '11px -apple-system, sans-serif'; ctx.fillStyle = '#6d796c'; ctx.fillText('D I E T E R  R A M S', 74, 550);
+      for (const item of list) {
+        ctx.save(); ctx.strokeStyle = item.color; ctx.fillStyle = item.color; ctx.lineWidth = item.width || 4;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        const x = Math.min(item.x, item.x2 ?? item.x), y = Math.min(item.y, item.y2 ?? item.y);
+        const w = Math.abs((item.x2 ?? item.x) - item.x), h = Math.abs((item.y2 ?? item.y) - item.y);
+        if (item.tool === 'rectangle') {
+          ctx.beginPath(); ctx.rect(x, y, w, h);
+          if (item.fill) { ctx.globalAlpha = 0.18; ctx.fill(); ctx.globalAlpha = 1; }
+          ctx.stroke();
+        } else if (item.tool === 'arrow') {
+          const ang = Math.atan2(item.y2 - item.y, item.x2 - item.x), head = 12 + ctx.lineWidth * 2;
+          ctx.beginPath(); ctx.moveTo(item.x, item.y); ctx.lineTo(item.x2, item.y2);
+          ctx.moveTo(item.x2 - head * Math.cos(ang - Math.PI / 6), item.y2 - head * Math.sin(ang - Math.PI / 6));
+          ctx.lineTo(item.x2, item.y2);
+          ctx.lineTo(item.x2 - head * Math.cos(ang + Math.PI / 6), item.y2 - head * Math.sin(ang + Math.PI / 6));
+          ctx.stroke();
+        } else if (item.tool === 'pen' || item.tool === 'highlighter') {
+          if (item.tool === 'highlighter') { ctx.globalAlpha = 0.32; ctx.lineWidth = (item.width || 4) * 5; }
+          ctx.beginPath(); item.points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)); ctx.stroke();
+        } else if (item.tool === 'mosaic' && w > 2 && h > 2) {
+          for (let mx = x; mx < x + w; mx += 12) for (let my = y; my < y + h; my += 12) {
+            ctx.fillStyle = ((mx + my) / 12) % 2 === 0 ? 'rgba(148,163,184,0.6)' : 'rgba(71,85,105,0.6)';
+            ctx.fillRect(mx, my, 12, 12);
+          }
+        } else if (item.tool === 'text') {
+          ctx.font = `600 ${18 + (item.width || 4) * 2}px -apple-system, sans-serif`; ctx.fillText(item.text, item.x, item.y);
+        }
+        ctx.restore();
+      }
+    }
+    paintCap(capHistory[capIdx]);
+
+    function pt(e) { const r = canvas.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * 960, y: ((e.clientY - r.top) / r.height) * 600 }; }
+    canvas.addEventListener('pointerdown', e => {
+      const p = pt(e);
+      if (capTool === 'text') {
+        const txt = prompt('输入标注文字：', '标注文字');
+        if (txt) { capHistory = [...capHistory.slice(0, capIdx + 1), [...capHistory[capIdx], { tool: 'text', x: p.x, y: p.y, color: capColor, width: capWidth, text: txt }]]; capIdx++; paintCap(capHistory[capIdx]); }
+        return;
+      }
+      if (capTool === 'select' || capTool === 'eraser') return;
+      capDraft = { tool: capTool, x: p.x, y: p.y, x2: p.x, y2: p.y, color: capColor, width: capWidth, fill: capFill, points: [p] };
+    });
+    canvas.addEventListener('pointermove', e => {
+      if (!capDraft) return;
+      const p = pt(e); capDraft.x2 = p.x; capDraft.y2 = p.y; capDraft.points.push(p);
+      paintCap([...capHistory[capIdx], capDraft]);
+    });
+    window.addEventListener('pointerup', () => {
+      if (!capDraft) return;
+      if (Math.abs(capDraft.x2 - capDraft.x) + Math.abs(capDraft.y2 - capDraft.y) > 4 || capDraft.points.length > 2) {
+        capHistory = [...capHistory.slice(0, capIdx + 1), [...capHistory[capIdx], capDraft]]; capIdx++;
+      }
+      capDraft = null; paintCap(capHistory[capIdx]);
+    });
+    document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-tool]').forEach(x => x.classList.remove('active'));
+      b.classList.add('active'); capTool = b.dataset.tool;
+      document.getElementById('qp-tool-name').textContent = toolNames[capTool] || capTool;
+    }));
+    document.querySelectorAll('#qp-colors .qp-dot').forEach(d => d.addEventListener('click', () => {
+      document.querySelectorAll('#qp-colors .qp-dot').forEach(x => x.classList.remove('active'));
+      d.classList.add('active'); capColor = d.dataset.color;
+    }));
+    document.getElementById('cap-width').addEventListener('input', e => { capWidth = Number(e.target.value); document.getElementById('cap-width-val').textContent = capWidth + 'px'; });
+    document.getElementById('cap-fill-btn').addEventListener('click', function () { capFill = !capFill; this.textContent = capFill ? '填充模式' : '边框模式'; this.classList.toggle('active', capFill); });
+    document.getElementById('cap-undo').addEventListener('click', () => { if (capIdx > 0) { capIdx--; paintCap(capHistory[capIdx]); } });
+    document.getElementById('cap-redo').addEventListener('click', () => { if (capIdx < capHistory.length - 1) { capIdx++; paintCap(capHistory[capIdx]); } });
+    document.getElementById('cap-clear-btn').addEventListener('click', () => { capHistory = [...capHistory.slice(0, capIdx + 1), []]; capIdx++; paintCap([]); });
+    document.getElementById('cap-save').addEventListener('click', () => { const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'snaplingo-capture.png'; a.click(); });
+    document.getElementById('cap-copy').addEventListener('click', () => alert('已复制到剪贴板'));
+
+    // ── Redesigned Pinned Image Interactive Controls ──────────────
+    const pinFrame = document.getElementById('pin-frame');
+    const pinShell = document.getElementById('pin-shell');
+    document.getElementById('pin-btn-border').addEventListener('click', function () { this.classList.toggle('active'); pinFrame.classList.toggle('bordered'); });
+    document.getElementById('pin-btn-gray').addEventListener('click', function () { this.classList.toggle('active'); pinFrame.classList.toggle('grayscale'); });
+    document.getElementById('pin-btn-inv').addEventListener('click', function () { this.classList.toggle('active'); pinFrame.classList.toggle('invert'); });
+    document.getElementById('pin-zoom').addEventListener('input', e => {
+      document.getElementById('pin-zoom-val').textContent = e.target.value + '%';
+      pinShell.style.transform = `scale(${e.target.value / 100})`;
+    });
+    document.getElementById('pin-opacity').addEventListener('input', e => {
+      document.getElementById('pin-opacity-val').textContent = e.target.value + '%';
+      pinFrame.style.opacity = e.target.value / 100;
+    });
+    document.getElementById('pin-btn-reset').addEventListener('click', () => {
+      document.getElementById('pin-zoom').value = 100; document.getElementById('pin-zoom-val').textContent = '100%'; pinShell.style.transform = 'scale(1)';
+      document.getElementById('pin-opacity').value = 100; document.getElementById('pin-opacity-val').textContent = '100%'; pinFrame.style.opacity = 1;
+    });
+    document.getElementById('rw-pin-btn').addEventListener('click', function () { this.classList.toggle('pinned'); });
+  </script>
+</body>
+</html>
