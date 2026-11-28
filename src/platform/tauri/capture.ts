@@ -257,8 +257,6 @@ export async function triggerScreenshot() {
 export const captureWorkspaceCommands: CaptureWorkspaceCommandsPort = {
   beginScrollingCapture: async (sessionId, rect) => { await invoke('begin_scrolling_capture', { sessionId, rect }); },
   listAnnotationFontFamilies: () => invoke<string[]>('list_annotation_font_families'),
-  lastAnnotationTool: () => invoke('last_annotation_tool'),
-  rememberAnnotationTool: (tool) => invoke('remember_annotation_tool', { tool }),
   createCaptureSession,
   getCaptureSession,
   hydrateCaptureSessionSnapshots,

@@ -199,10 +199,6 @@ export function nextTextFontSize(
   return stepBoundedValue(value, direction, MIN_TEXT_FONT_SIZE, MAX_TEXT_FONT_SIZE, amount);
 }
 
-export function nextBlurRadius(value: number, direction: AnnotationSizeDirection, amount = 1) {
-  return stepBoundedValue(value, direction, MIN_BLUR_RADIUS, MAX_BLUR_RADIUS, amount);
-}
-
 function constrainToSquare(startPoint: Point, currentPoint: Point): Point {
   const deltaX = currentPoint.x - startPoint.x;
   const deltaY = currentPoint.y - startPoint.y;
@@ -241,7 +237,6 @@ export function constrainAnnotationGesturePoint(
     tool === 'rectangle' ||
     tool === 'ellipse' ||
     tool === 'region-highlight' ||
-    tool === 'blur' ||
     tool === 'spotlight'
   ) {
     return constrainToSquare(startPoint, currentPoint);
@@ -273,6 +268,7 @@ export function isPointStrokeAnnotationTool(tool: AnnotationTool) {
     tool === 'pen' ||
     tool === 'highlight' ||
     tool === 'mosaic' ||
+    tool === 'blur' ||
     tool === 'eraser'
   );
 }
@@ -335,16 +331,13 @@ export function annotationFromGesture(
     };
   }
 
-  if (tool === 'region-highlight' || tool === 'blur' || tool === 'spotlight') {
+  if (tool === 'region-highlight' || tool === 'spotlight') {
     const region = {
       rect: normalizeSelection(startPoint, currentPoint),
       corner_radius: style.cornerRadius ?? 0,
     };
     if (tool === 'region-highlight') {
       return { type: tool, ...region, color: style.color };
-    }
-    if (tool === 'blur') {
-      return { type: tool, ...region, radius: style.blurRadius ?? DEFAULT_BLUR_RADIUS };
     }
     return { type: tool, ...region };
   }
@@ -364,6 +357,15 @@ export function annotationFromGesture(
       points: points ?? [startPoint, currentPoint],
       color: [style.color[0], style.color[1], style.color[2], HIGHLIGHT_ALPHA],
       stroke_width: style.strokeWidth,
+    };
+  }
+
+  if (tool === 'blur') {
+    return {
+      type: 'blur',
+      points: points ?? [startPoint, currentPoint],
+      stroke_width: annotationBrushDiameter(tool, style.strokeWidth),
+      radius: style.blurRadius ?? DEFAULT_BLUR_RADIUS,
     };
   }
 
@@ -463,13 +465,19 @@ export function applyAnnotationStyle(
   style: AnnotationStyle,
   fontSize = DEFAULT_TEXT_FONT_SIZE,
 ): AnnotationCommand {
-  if (annotation.type === 'blur' || annotation.type === 'spotlight' || annotation.type === 'region-highlight') {
+  if (annotation.type === 'spotlight' || annotation.type === 'region-highlight') {
     return {
       ...annotation,
       corner_radius: style.cornerRadius ?? annotation.corner_radius ?? 0,
-      ...(annotation.type === 'blur' ? { radius: style.blurRadius ?? annotation.radius } : {}),
       ...(annotation.type === 'region-highlight' ? { color: style.color } : {}),
     } as AnnotationCommand;
+  }
+  if (annotation.type === 'blur') {
+    return {
+      ...annotation,
+      stroke_width: annotationBrushDiameter('blur', style.strokeWidth),
+      radius: style.blurRadius ?? annotation.radius,
+    };
   }
   if (annotation.type === 'mosaic') {
     return {
@@ -529,11 +537,11 @@ function mosaicBlockSize(strokeWidth: number) {
 }
 
 export function annotationBrushDiameter(
-  tool: Extract<AnnotationTool, 'mosaic' | 'eraser'>,
+  tool: Extract<AnnotationTool, 'mosaic' | 'blur' | 'eraser'>,
   strokeWidth: number,
 ) {
-  const scale = tool === 'mosaic' ? 5 : 4;
-  const minimum = tool === 'mosaic' ? 18 : 14;
+  const scale = tool === 'eraser' ? 4 : 5;
+  const minimum = tool === 'eraser' ? 14 : 18;
   return Math.max(minimum, Math.round(strokeWidth * scale));
 }
 
@@ -546,7 +554,6 @@ export function isCommittedAnnotation(annotation: AnnotationCommand) {
     annotation.type === 'rectangle' ||
     annotation.type === 'ellipse' ||
     annotation.type === 'region-highlight' ||
-    annotation.type === 'blur' ||
     annotation.type === 'spotlight'
   ) {
     return (
@@ -569,7 +576,7 @@ export function isCommittedAnnotation(annotation: AnnotationCommand) {
     return pathLength >= MIN_ANNOTATION_SIZE;
   }
 
-  if (annotation.type === 'mosaic' || annotation.type === 'eraser') {
+  if (annotation.type === 'mosaic' || annotation.type === 'blur' || annotation.type === 'eraser') {
     return annotation.points.length > 0;
   }
 

@@ -44,7 +44,6 @@ import {
   type CaptureSelectionStorage,
 } from './captureSelectionHistory';
 import { emptyAnnotationHistory } from './annotationHistory';
-import type { AnnotationTool } from './annotationStyle';
 import { isScrollingCaptureShortcut, annotationShortcutBindings, normalizeEditorShortcutKey } from './annotationShortcuts';
 import { planCaptureManualSelectionTransition } from './captureEditorRuntime';
 import { createCaptureEditing } from './editing';
@@ -207,10 +206,6 @@ export function createCaptureWorkspaceRuntime({
   storage?: CaptureSelectionStorage;
 }): CaptureWorkspaceRuntime {
   let state = createInitialState('screenshot', undefined, screenshotPreferences?.());
-  let lastAnnotationTool: AnnotationTool = 'rectangle';
-  let toolWrite = Promise.resolve();
-  const initialAnnotationTool = () =>
-    screenshotPreferences?.()?.rememberLastTool ? lastAnnotationTool : 'rectangle';
   let generation = 0;
   let disposed = false;
   let hydratedSessionId: string | null = null;
@@ -351,13 +346,6 @@ export function createCaptureWorkspaceRuntime({
 
   const patch = (next: Partial<RuntimeState>) => {
     if (disposed) return;
-    if (next.activeAnnotationTool && next.activeAnnotationTool !== state.activeAnnotationTool) {
-      lastAnnotationTool = next.activeAnnotationTool;
-      if (screenshotPreferences?.()?.rememberLastTool && platform.commands.rememberAnnotationTool) {
-        const tool = next.activeAnnotationTool;
-        toolWrite = toolWrite.then(() => platform.commands.rememberAnnotationTool!(tool)).catch(() => {});
-      }
-    }
     state = { ...state, ...next };
     listeners.forEach((listener) => listener());
   };
@@ -677,7 +665,7 @@ export function createCaptureWorkspaceRuntime({
     const activeAnnotationTool =
       state.status === 'preview'
         ? state.activeAnnotationTool
-        : initialAnnotationTool();
+        : 'rectangle';
     // The view crops frozen monitors once decoding finishes. Encoding is only
     // needed for terminal output, so entering or resizing preview never blocks.
     patch({
@@ -727,7 +715,7 @@ export function createCaptureWorkspaceRuntime({
       completion,
       activeAnnotationTool:
         completion.type === 'preview' && state.status !== 'preview'
-          ? initialAnnotationTool()
+          ? 'rectangle'
           : state.activeAnnotationTool,
     });
     if (transition.clearOverlay) host?.resetInteraction();
@@ -1112,14 +1100,9 @@ export function createCaptureWorkspaceRuntime({
       snapshotHydration = null;
 
       try {
-        const [session, rememberedTool] = await Promise.all([
-          requestedSessionId
-            ? platform.commands.getCaptureSession(requestedSessionId)
-            : platform.commands.createCaptureSession(),
-          screenshotPreferences?.()?.rememberLastTool
-            ? toolWrite.then(() => platform.commands.lastAnnotationTool?.()).catch(() => null)
-            : Promise.resolve(null),
-        ]);
+        const session = requestedSessionId
+          ? await platform.commands.getCaptureSession(requestedSessionId)
+          : await platform.commands.createCaptureSession();
         provisionalSessionIds.add(session.id);
         if (generation !== actionGeneration) {
           provisionalSessionIds.delete(session.id);
@@ -1127,7 +1110,6 @@ export function createCaptureWorkspaceRuntime({
           await cancelStalePrevious();
           return;
         }
-        if (rememberedTool) lastAnnotationTool = rememberedTool;
         if (previousSessionId && previousSessionId !== session.id) {
           try {
             await cancelNativeSessionOnce(previousSessionId);

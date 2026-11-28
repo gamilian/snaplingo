@@ -69,6 +69,7 @@ describe("capture presentation", () => {
     expect(getCaptureRootCursorStyle("preview", "mosaic")).toContain(
       "data:image/svg+xml",
     );
+    expect(getCaptureEditorCursorStyle("blur", 6)).toBe(getCaptureEditorCursorStyle("mosaic", 6));
     expect(getCaptureEditorCursorStyle("pen")).toContain("data:image/svg+xml");
     expect(getCaptureEditorCursorStyle("eraser")).toContain(
       "data:image/svg+xml",

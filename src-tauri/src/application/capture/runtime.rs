@@ -36,7 +36,6 @@ pub struct CaptureSessionRuntime {
     pub(super) presentations: tokio::sync::Mutex<HashMap<CaptureSessionId, u64>>,
     pub(super) ocr_generation: tokio::sync::watch::Sender<u64>,
     pending_ocr: tokio::sync::Mutex<Option<PendingCaptureOcr>>,
-    last_annotation_tool: std::sync::Mutex<String>,
 }
 
 impl CaptureSessionRuntime {
@@ -79,7 +78,6 @@ impl CaptureSessionRuntime {
             presentations: tokio::sync::Mutex::new(HashMap::new()),
             ocr_generation: tokio::sync::watch::channel(0).0,
             pending_ocr: tokio::sync::Mutex::new(None),
-            last_annotation_tool: std::sync::Mutex::new("rectangle".into()),
         }
     }
 
@@ -101,20 +99,6 @@ impl CaptureSessionRuntime {
 
     pub fn annotation_font_families(&self) -> Vec<String> {
         self.image_composition.annotation_font_families()
-    }
-
-    pub fn last_annotation_tool(&self) -> String {
-        self.last_annotation_tool.lock().unwrap().clone()
-    }
-
-    pub fn remember_annotation_tool(&self, tool: String) -> Result<()> {
-        if tool == "scrolling"
-            || !crate::domain::config::default_annotation_tool_shortcuts().contains_key(&tool)
-        {
-            return Err("Unknown annotation tool".into());
-        }
-        *self.last_annotation_tool.lock().unwrap() = tool;
-        Ok(())
     }
 
     pub async fn pin_from_shortcut(&self) -> Result<()> {
@@ -1271,28 +1255,6 @@ mod tests {
         (runtime, sessions, pin_output)
     }
 
-    #[tokio::test]
-    async fn annotation_tool_memory_survives_capture_cleanup_and_resets_with_the_runtime() {
-        let (runtime, _, _) = make_runtime(
-            Arc::new(RecordingRuntimeHost::succeeds()),
-            vec![make_snapshot()],
-        );
-        assert_eq!(runtime.last_annotation_tool(), "rectangle");
-        runtime.remember_annotation_tool("blur".into()).unwrap();
-        let session = runtime.create_session_from_visible_desktop().await.unwrap();
-        runtime.cancel_capture_session(&session.id).await.unwrap();
-        assert_eq!(runtime.last_annotation_tool(), "blur");
-        for tool in ["scrolling", "unknown"] {
-            assert!(runtime.remember_annotation_tool(tool.into()).is_err());
-            assert_eq!(runtime.last_annotation_tool(), "blur");
-        }
-        let (restarted, _, _) = make_runtime(
-            Arc::new(RecordingRuntimeHost::succeeds()),
-            vec![make_snapshot()],
-        );
-        assert_eq!(restarted.last_annotation_tool(), "rectangle");
-    }
-
     mod scrolling_tests {
         use super::*;
         use crate::application::capture::{
@@ -1581,6 +1543,51 @@ mod tests {
                     .count(),
                 1
             );
+        }
+
+        #[tokio::test]
+        async fn scrolling_back_updates_the_preview_and_exports_only_the_retained_rows() {
+            use base64::Engine;
+
+            let live = Arc::new(ScrollingHost::default());
+            live.frames.lock().unwrap().extend(
+                [20, 40, 10, 10]
+                    .into_iter()
+                    .map(|offset| Ok(vec![snapshot(offset)])),
+            );
+            let (runtime, sessions, pins) = make_runtime(
+                Arc::new(RecordingRuntimeHost::succeeds()),
+                vec![snapshot(0)],
+            );
+            let runtime = runtime.with_scrolling_host(live);
+            let (_, view) = start(&runtime, &sessions, snapshot(0).logical_bounds).await;
+            for expected_height in [120, 140, 110] {
+                let view = runtime.capture_scrolling_frame(&view.id).await.unwrap();
+                assert_eq!(view.height, expected_height);
+                let preview = base64::engine::general_purpose::STANDARD
+                    .decode(&view.preview_base64)
+                    .unwrap();
+                assert_eq!(
+                    image::load_from_memory(&preview).unwrap().height(),
+                    expected_height
+                );
+                assert!(view.hint.is_none());
+            }
+            runtime
+                .finish_scrolling_capture(
+                    &view.id,
+                    crate::domain::capture::ScrollingCaptureOutputAction::Pin,
+                )
+                .await
+                .unwrap();
+            let output = image::load_from_memory(&pins.pngs.lock().unwrap()[0])
+                .unwrap()
+                .to_rgba8();
+            assert_eq!(output.dimensions(), (64, 110));
+            let last = image::load_from_memory(&snapshot(10).png_data)
+                .unwrap()
+                .to_rgba8();
+            assert_eq!(output.get_pixel(8, 109), last.get_pixel(8, 99));
         }
 
         #[tokio::test]

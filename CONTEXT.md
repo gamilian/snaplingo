@@ -78,9 +78,11 @@ The handoff of a Capture Session OCR result to the OCR window, translation windo
 
 The editing state within a Capture Session: selection geometry, annotation gestures, selected annotations, text drafts, styles, and undo/redo history. Pointer, keyboard, and toolbar intents share its state transitions. An edit commit publishes a consistent snapshot; Capture Session loading, cancellation, and output remain separate workflows.
 
+Each new capture starts editing with the rectangle tool. Tool changes persist within that edit, including after drawing, resizing the selection, and undo/redo. Mosaic and Blur use round brush strokes sampled from the frozen capture pixels; brush size and blur strength are separate properties.
+
 ### Scrolling Capture
 
-A sequence of images from one selected viewport while the user scrolls its content. Matching overlapping content produces one long image, retaining fixed headers and footers once. The latest appended segment can be undone without discarding earlier content. A Scrolling Capture is distinct from the frozen desktop image of an ordinary Capture Session. Complete copies and saves a PNG; reaching its configured height limit invokes the same output. A separate transparent Preview observes the task and passes mouse input through. A transparent viewport outline indicates the original capture region and also passes mouse input through.
+A sequence of images from one selected viewport while the user scrolls its content. Matching overlapping content produces one long image spanning the initial viewport and the current viewport, retaining fixed headers and footers once. Scrolling back retracts the excess rows; crossing the initial position starts extending in the other direction. The latest retained appended segment can be undone without discarding earlier content. A Scrolling Capture is distinct from the frozen desktop image of an ordinary Capture Session. Complete copies and saves a PNG; reaching its configured height limit invokes the same output. A separate transparent Preview observes the task and passes mouse input through. A transparent viewport outline indicates the original capture region and also passes mouse input through.
 
 ### Result Window and Pinned Image
 

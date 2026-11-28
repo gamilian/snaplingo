@@ -5,7 +5,6 @@ import type {
   TextAnnotationCommand,
 } from '../../domain/capture';
 import {
-  annotationFromGesture,
   completeAnnotationGesture,
   DEFAULT_ANNOTATION_STYLE,
 } from './annotationStyle';
@@ -27,27 +26,16 @@ const arrow: ArrowAnnotationCommand = {
 };
 
 describe('extended annotation editing', () => {
-  it('creates a rounded blur region and applies Shift square constraints', () => {
-    const blur = completeAnnotationGesture(
-      { tool: 'blur', startPoint: { x: 10, y: 20 } },
-      { x: 70, y: 60 },
-      { ...DEFAULT_ANNOTATION_STYLE, blurRadius: 12, cornerRadius: 8 },
-      true,
-    );
-    expect(blur).toEqual({
-      type: 'blur',
-      rect: { x: 10, y: 20, width: 40, height: 40 },
-      radius: 12,
-      corner_radius: 8,
-    });
-    expect(
-      annotationFromGesture(
-        'spotlight',
-        { x: 10, y: 20 },
-        { x: 40, y: 60 },
-        DEFAULT_ANNOTATION_STYLE,
-      ).type,
-    ).toBe('spotlight');
+  it('creates a continuous blur brush and keeps single-click dabs', () => {
+    const points = [{ x: 10, y: 20 }, { x: 20, y: 50 }, { x: 70, y: 60 }];
+    expect(completeAnnotationGesture(
+      { tool: 'blur', startPoint: points[0], points: points.slice(0, 2) },
+      points[2], { ...DEFAULT_ANNOTATION_STYLE, strokeWidth: 6, blurRadius: 12 }, false,
+    )).toEqual({ type: 'blur', points, stroke_width: 30, radius: 12 });
+    expect(completeAnnotationGesture(
+      { tool: 'blur', startPoint: points[0], points: [points[0]] },
+      points[0], DEFAULT_ANNOTATION_STYLE, false,
+    )).toEqual({ type: 'blur', points: [points[0]], stroke_width: 18, radius: 16 });
   });
 
   it('selects a curved arrow along its stroke and leaves empty parts of its bounding box unselected', () => {
@@ -85,15 +73,16 @@ describe('extended annotation editing', () => {
     expect(resized.control1).toEqual({ x: 60, y: 20 });
   });
 
-  it('limits a radius handle to half the short edge without changing blur strength', () => {
+  it('moves a blur stroke with its round brush bounds and preserves strength', () => {
     const blur: BlurAnnotationCommand = {
-      type: 'blur',
-      rect: { x: 20, y: 20, width: 80, height: 40 },
-      radius: 12,
+      type: 'blur', points: [{ x: 20, y: 20 }, { x: 80, y: 40 }],
+      stroke_width: 20, radius: 12,
     };
-    expect(
-      resizeAnnotationByHandle(blur, 'radius', { x: -100, y: 100 }, bounds),
-    ).toMatchObject({ corner_radius: 20, radius: 12 });
+    expect(getAnnotationBounds(blur)).toEqual({ x: 10, y: 10, width: 80, height: 40 });
+    expect(moveAnnotationByDelta(blur, { x: 5, y: 10 })).toEqual({
+      ...blur, points: [{ x: 25, y: 30 }, { x: 85, y: 50 }],
+    });
+    expect(resizeAnnotationByHandle(blur, 'radius', { x: -100, y: 100 }, bounds)).toEqual(blur);
   });
 
   it('resizes text with its frame while retaining the selected typeface and style', () => {

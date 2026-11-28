@@ -9,7 +9,6 @@ import type {
   OcrResult,
   Point,
 } from '../../domain/capture';
-import type { AnnotationTool } from './annotationStyle';
 
 export type CaptureWorkspaceUnsubscribe = () => void;
 
@@ -72,8 +71,6 @@ export interface OutputCaptureInput extends RenderCaptureOutputInput {
 export interface CaptureWorkspaceCommandsPort {
   beginScrollingCapture?(sessionId: string, rect: LogicalRect): Promise<void>;
   listAnnotationFontFamilies?(): Promise<string[]>;
-  lastAnnotationTool?(): Promise<AnnotationTool | null>;
-  rememberAnnotationTool?(tool: AnnotationTool): Promise<void>;
   createCaptureSession(): Promise<CaptureSessionView>;
   getCaptureSession(sessionId: string): Promise<CaptureSessionView>;
   hydrateCaptureSessionSnapshots(sessionId: string): Promise<CaptureSessionView>;

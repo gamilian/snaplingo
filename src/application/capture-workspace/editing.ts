@@ -219,7 +219,6 @@ export function createCaptureEditing({
       textFontSize: toolbar.textFontSize,
       direction,
       isTextSizingActive: type === 'text',
-      isBlurSizingActive: type === 'blur',
       amount,
     });
     if (state.textDraft) {

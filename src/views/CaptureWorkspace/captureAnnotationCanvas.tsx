@@ -181,6 +181,45 @@ function drawPixelatedBrush(
   context.restore();
 }
 
+function drawBlurredBrush(
+  context: CanvasRenderingContext2D,
+  source: HTMLCanvasElement,
+  points: Point[],
+  diameter: number,
+  radius: number,
+  buffer: HTMLCanvasElement,
+) {
+  const bounds = brushBounds(points, diameter);
+  if (!bounds) return;
+  const pixelRatio = context.getTransform().a || 1;
+  const sigma = radius * pixelRatio;
+  const padding = Math.ceil(sigma * 3);
+  const left = Math.max(0, Math.floor(bounds.x * pixelRatio) - padding);
+  const top = Math.max(0, Math.floor(bounds.y * pixelRatio) - padding);
+  const right = Math.min(source.width, Math.ceil((bounds.x + bounds.width) * pixelRatio) + padding);
+  const bottom = Math.min(source.height, Math.ceil((bounds.y + bounds.height) * pixelRatio) + padding);
+  if (right <= left || bottom <= top) return;
+  // Read only the affected crop from frozen pixels, so overlap never compounds
+  // the blur and live brush segments do not copy or filter the entire screen.
+  buffer.width = right - left;
+  buffer.height = bottom - top;
+  const bufferContext = buffer.getContext('2d');
+  if (!bufferContext) return;
+  bufferContext.drawImage(source, left, top, buffer.width, buffer.height, 0, 0, buffer.width, buffer.height);
+  const supportsFilter = 'filter' in context;
+  if (!supportsFilter) {
+    const pixels = bufferContext.getImageData(0, 0, buffer.width, buffer.height);
+    pixels.data.set(blurRgbaPixels(pixels.data, pixels.width, pixels.height, sigma));
+    bufferContext.putImageData(pixels, 0, 0);
+  }
+  context.save();
+  appendBrushPath(context, points, diameter);
+  context.clip();
+  if (supportsFilter) context.filter = `blur(${sigma}px)`;
+  context.drawImage(buffer, left / pixelRatio, top / pixelRatio, buffer.width / pixelRatio, buffer.height / pixelRatio);
+  context.restore();
+}
+
 function eraseBrush(
   context: CanvasRenderingContext2D,
   points: Point[],
@@ -237,7 +276,15 @@ export function drawCaptureAnnotation(
   },
 ) {
   if (annotation.type === 'spotlight') return;
-  if (annotation.type === 'blur' || annotation.type === 'region-highlight') {
+  if (annotation.type === 'blur') {
+    drawBlurredBrush(
+      context, buffers?.source ?? context.canvas, annotation.points,
+      annotation.stroke_width, annotation.radius,
+      buffers?.mosaic ?? document.createElement('canvas'),
+    );
+    return;
+  }
+  if (annotation.type === 'region-highlight') {
     const source = buffers?.source ?? context.canvas;
     const buffer = buffers?.mosaic ?? document.createElement('canvas');
     buffer.width = source.width;
@@ -247,32 +294,15 @@ export function drawCaptureAnnotation(
     const pixelRatio = context.getTransform().a || 1;
     bufferContext.drawImage(source, 0, 0);
     bufferContext.drawImage(context.canvas, 0, 0);
-    const supportsFilter = 'filter' in context;
-    if (annotation.type === 'blur' && !supportsFilter) {
-      const sigma = annotation.radius * pixelRatio;
-      const padding = Math.ceil(sigma * 3);
-      const left = Math.max(0, Math.floor(annotation.rect.x * pixelRatio) - padding);
-      const top = Math.max(0, Math.floor(annotation.rect.y * pixelRatio) - padding);
-      const right = Math.min(buffer.width, Math.ceil((annotation.rect.x + annotation.rect.width) * pixelRatio) + padding);
-      const bottom = Math.min(buffer.height, Math.ceil((annotation.rect.y + annotation.rect.height) * pixelRatio) + padding);
-      if (right > left && bottom > top) {
-        const pixels = bufferContext.getImageData(left, top, right - left, bottom - top);
-        pixels.data.set(blurRgbaPixels(pixels.data, pixels.width, pixels.height, sigma));
-        bufferContext.putImageData(pixels, left, top);
-      }
-    }
-    if (annotation.type !== 'blur') {
-      bufferContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-      bufferContext.globalCompositeOperation = 'multiply';
-      bufferContext.fillStyle = annotationColorToCss(annotation.color);
-      bufferContext.globalAlpha = 0.588;
-      roundedRegionPath(bufferContext, annotation.rect, annotation.corner_radius);
-      bufferContext.fill();
-    }
+    bufferContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    bufferContext.globalCompositeOperation = 'multiply';
+    bufferContext.fillStyle = annotationColorToCss(annotation.color);
+    bufferContext.globalAlpha = 0.588;
+    roundedRegionPath(bufferContext, annotation.rect, annotation.corner_radius);
+    bufferContext.fill();
     context.save();
     roundedRegionPath(context, annotation.rect, annotation.corner_radius);
     context.clip();
-    if (annotation.type === 'blur' && supportsFilter) context.filter = `blur(${annotation.radius * pixelRatio}px)`;
     context.drawImage(buffer, 0, 0, buffer.width / pixelRatio, buffer.height / pixelRatio);
     context.restore();
     return;
@@ -464,7 +494,7 @@ export function CaptureAnnotationCanvas({
       window.devicePixelRatio || 1,
       outputPixelSize,
     );
-  const nonMosaicDraftAnnotation = draftAnnotation?.type === 'mosaic'
+  const nonBrushDraftAnnotation = (draftAnnotation?.type === 'mosaic' || draftAnnotation?.type === 'blur')
     ? null
     : draftAnnotation;
 
@@ -500,7 +530,7 @@ export function CaptureAnnotationCanvas({
     if (!context) return;
     context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     context.clearRect(0, 0, selection.width, selection.height);
-    drawCaptureSpotlights(context, nonMosaicDraftAnnotation ? [...annotations, nonMosaicDraftAnnotation] : annotations, selection);
+    drawCaptureSpotlights(context, nonBrushDraftAnnotation ? [...annotations, nonBrushDraftAnnotation] : annotations, selection);
     for (const annotation of annotations) {
       drawCaptureAnnotation(context, annotation, {
         mosaic: mosaicBufferRef.current ??
@@ -508,8 +538,8 @@ export function CaptureAnnotationCanvas({
         source: sourceRef.current ?? context.canvas,
       });
     }
-    if (nonMosaicDraftAnnotation) {
-      drawCaptureAnnotation(context, nonMosaicDraftAnnotation, {
+    if (nonBrushDraftAnnotation) {
+      drawCaptureAnnotation(context, nonBrushDraftAnnotation, {
         mosaic: mosaicBufferRef.current ??
           (mosaicBufferRef.current = document.createElement('canvas')),
         source: sourceRef.current ?? context.canvas,
@@ -517,7 +547,7 @@ export function CaptureAnnotationCanvas({
     }
   }, [
     annotations,
-    nonMosaicDraftAnnotation,
+    nonBrushDraftAnnotation,
     selection,
     pixelRatio,
     pixelWidth,
@@ -541,32 +571,33 @@ export function CaptureAnnotationCanvas({
       previous.pixelWidth === pixelWidth &&
       previous.pixelHeight === pixelHeight &&
       previous.selection === selection;
-    const previousMosaic = previous?.annotation?.type === 'mosaic'
+    const previousBrush = (previous?.annotation?.type === 'mosaic' || previous?.annotation?.type === 'blur')
       ? previous.annotation
       : null;
-    const nextMosaic = draftAnnotation?.type === 'mosaic' ? draftAnnotation : null;
-    const isMosaicExtension = Boolean(
-      sameSurface && previousMosaic && nextMosaic &&
-      previousMosaic.stroke_width === nextMosaic.stroke_width &&
-      previousMosaic.block_size === nextMosaic.block_size &&
-      nextMosaic.points.length >= previousMosaic.points.length &&
-      previousMosaic.points.every((point, index) => {
-        const nextPoint = nextMosaic.points[index];
+    const nextBrush = (draftAnnotation?.type === 'mosaic' || draftAnnotation?.type === 'blur') ? draftAnnotation : null;
+    const isBrushExtension = Boolean(
+      sameSurface && previousBrush && nextBrush &&
+      previousBrush.stroke_width === nextBrush.stroke_width &&
+      ((previousBrush.type === 'mosaic' && nextBrush.type === 'mosaic' && previousBrush.block_size === nextBrush.block_size) ||
+        (previousBrush.type === 'blur' && nextBrush.type === 'blur' && previousBrush.radius === nextBrush.radius)) &&
+      nextBrush.points.length >= previousBrush.points.length &&
+      previousBrush.points.every((point, index) => {
+        const nextPoint = nextBrush.points[index];
         return point.x === nextPoint?.x && point.y === nextPoint?.y;
       }),
     );
 
-    if (isMosaicExtension && previousMosaic && nextMosaic) {
-      const addedPoints = nextMosaic.points.slice(
-        Math.max(0, previousMosaic.points.length - 1),
+    if (isBrushExtension && previousBrush && nextBrush) {
+      const addedPoints = nextBrush.points.slice(
+        Math.max(0, previousBrush.points.length - 1),
       );
       if (addedPoints.length > 1) {
-        drawCaptureAnnotation(context, { ...nextMosaic, points: addedPoints }, buffers);
+        drawCaptureAnnotation(context, { ...nextBrush, points: addedPoints }, buffers);
       }
     } else {
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
       context.clearRect(0, 0, selection.width, selection.height);
-      if (nextMosaic) drawCaptureAnnotation(context, nextMosaic, buffers);
+      if (nextBrush) drawCaptureAnnotation(context, nextBrush, buffers);
     }
 
     paintedDraftRef.current = {

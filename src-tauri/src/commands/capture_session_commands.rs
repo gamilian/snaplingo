@@ -49,23 +49,6 @@ pub async fn list_annotation_font_families(
 }
 
 #[tauri::command]
-pub fn last_annotation_tool(state: State<'_, crate::AppState>) -> String {
-    state.capture.runtime.last_annotation_tool()
-}
-
-#[tauri::command]
-pub fn remember_annotation_tool(
-    tool: String,
-    state: State<'_, crate::AppState>,
-) -> Result<(), String> {
-    state
-        .capture
-        .runtime
-        .remember_annotation_tool(tool)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 pub async fn reveal_capture_window(
     session_id: Option<String>,
     state: State<'_, crate::AppState>,

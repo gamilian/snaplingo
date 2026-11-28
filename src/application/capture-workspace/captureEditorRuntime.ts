@@ -15,8 +15,6 @@ import {
   isPointStrokeAnnotationTool,
   nextAnnotationStrokeWidth,
   nextTextFontSize,
-  nextBlurRadius,
-  DEFAULT_BLUR_RADIUS,
 } from './annotationStyle';
 import type { AnnotationHistory } from './annotationHistory';
 import {
@@ -53,23 +51,25 @@ export function deriveCaptureEditorToolbarState(
   currentState: CaptureEditorToolbarState,
   annotation: AnnotationCommand,
 ): CaptureEditorToolbarState {
-  if (annotation.type === 'blur' || annotation.type === 'spotlight' || annotation.type === 'region-highlight') {
+  if (annotation.type === 'spotlight' || annotation.type === 'region-highlight') {
     return {
       ...currentState,
       annotationStyle: {
         ...currentState.annotationStyle,
         cornerRadius: annotation.corner_radius ?? 0,
-        ...(annotation.type === 'blur' ? { blurRadius: annotation.radius } : {}),
         ...(annotation.type === 'region-highlight' ? { color: annotation.color } : {}),
       },
     };
   }
-  if (annotation.type === 'mosaic') {
+  if (annotation.type === 'mosaic' || annotation.type === 'blur') {
     return {
       ...currentState,
       annotationStyle: {
         ...currentState.annotationStyle,
-        strokeWidth: Math.max(1, Math.round(annotation.stroke_width / 5)),
+        strokeWidth: Math.max(1, annotation.type === 'blur'
+          ? Math.floor(annotation.stroke_width / 5)
+          : Math.round(annotation.stroke_width / 5)),
+        ...(annotation.type === 'blur' ? { blurRadius: annotation.radius } : {}),
       },
     };
   }
@@ -308,25 +308,16 @@ export function planCaptureAnnotationSizeAdjustment({
   textFontSize,
   direction,
   isTextSizingActive,
-  isBlurSizingActive = false,
   amount = 1,
 }: CaptureEditorToolbarState & {
   direction: AnnotationSizeDirection;
   isTextSizingActive: boolean;
-  isBlurSizingActive?: boolean;
   amount?: number;
 }): CaptureEditorToolbarState {
   if (isTextSizingActive) {
     return {
       annotationStyle,
       textFontSize: nextTextFontSize(textFontSize, direction, amount),
-    };
-  }
-
-  if (isBlurSizingActive) {
-    return {
-      annotationStyle: { ...annotationStyle, blurRadius: nextBlurRadius(annotationStyle.blurRadius ?? DEFAULT_BLUR_RADIUS, direction, amount) },
-      textFontSize,
     };
   }
 

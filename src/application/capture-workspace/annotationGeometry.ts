@@ -38,7 +38,7 @@ export function annotationSpecialHandles(annotation: AnnotationCommand): { handl
       { handle: 'control2', point: c2 },
     ];
   }
-  if ('corner_radius' in annotation || annotation.type === 'rectangle' || annotation.type === 'blur' || annotation.type === 'spotlight' || annotation.type === 'region-highlight') {
+  if ('corner_radius' in annotation || annotation.type === 'rectangle' || annotation.type === 'spotlight' || annotation.type === 'region-highlight') {
     if (!('rect' in annotation)) return [];
     const radius = Math.min(annotation.corner_radius ?? 0, Math.min(annotation.rect.width, annotation.rect.height) / 2);
     return [{ handle: 'radius', point: { x: annotation.rect.x + annotation.rect.width - 8 - radius / 2, y: annotation.rect.y + 8 + radius / 2 } }];
@@ -94,6 +94,7 @@ export function getAnnotationBounds(annotation: AnnotationCommand): LogicalRect 
     annotation.type === 'freehand' ||
     annotation.type === 'highlight' ||
     annotation.type === 'mosaic' ||
+    annotation.type === 'blur' ||
     annotation.type === 'eraser'
   ) {
     return boundsFromPoints(annotation.points, annotation.stroke_width / 2);
@@ -173,6 +174,7 @@ export function moveAnnotationByDelta(
     annotation.type === 'freehand' ||
     annotation.type === 'highlight' ||
     annotation.type === 'mosaic' ||
+    annotation.type === 'blur' ||
     annotation.type === 'eraser'
   ) {
     return {

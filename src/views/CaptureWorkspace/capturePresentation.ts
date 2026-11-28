@@ -28,7 +28,7 @@ export function getCaptureEditorCursorStyle(
   uiScale = 1,
 ) {
   if (activeAnnotationTool === 'text') return 'text';
-  if (activeAnnotationTool === 'mosaic') return brushCursor('mosaic', strokeWidth);
+  if (activeAnnotationTool === 'mosaic' || activeAnnotationTool === 'blur') return brushCursor(activeAnnotationTool, strokeWidth);
   if (activeAnnotationTool === 'eraser') return brushCursor('eraser', strokeWidth);
   if (activeAnnotationTool === 'pen' || activeAnnotationTool === 'highlight') {
     return pencilCursor(uiScale);
@@ -66,7 +66,7 @@ function pencilCursor(uiScale: number) {
 }
 
 function brushCursor(
-  tool: Extract<AnnotationTool, 'mosaic' | 'eraser'>,
+  tool: Extract<AnnotationTool, 'mosaic' | 'blur' | 'eraser'>,
   strokeWidth: number,
 ) {
   const diameter = annotationBrushDiameter(tool, strokeWidth);
@@ -112,7 +112,7 @@ function getCaptureEditorCursorClassName(
   activeAnnotationTool: AnnotationTool | null,
 ) {
   if (activeAnnotationTool === 'text') return 'cursor-text';
-  if (activeAnnotationTool === 'mosaic' || activeAnnotationTool === 'eraser') {
+  if (activeAnnotationTool === 'mosaic' || activeAnnotationTool === 'blur' || activeAnnotationTool === 'eraser') {
     return 'cursor-crosshair';
   }
   return 'cursor-default';

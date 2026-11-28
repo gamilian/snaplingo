@@ -107,7 +107,7 @@ export function ScrollingCaptureWindow({
       >
         {working
           ? '正在处理…'
-          : (error ?? view?.hint ?? '手动滚动页面，完成后复制并保存 PNG。')}
+          : (error ?? view?.hint ?? '滚动扩展长图，往回滚可收回多截的部分。完成后复制并保存 PNG。')}
         {error && (
           <button
             type="button"

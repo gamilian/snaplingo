@@ -78,7 +78,7 @@ fn highlighter_retains_black_text_and_tints_the_white_background() {
 }
 
 #[test]
-fn blur_smooths_contrast_without_changing_pixels_outside_the_region() {
+fn blur_brush_smooths_contrast_without_changing_pixels_outside_the_stroke() {
     let source = image::RgbaImage::from_fn(100, 100, |x, _| {
         if x < 50 {
             image::Rgba([0, 0, 0, 255])
@@ -89,20 +89,48 @@ fn blur_smooths_contrast_without_changing_pixels_outside_the_region() {
     let output = compose(
         source.clone(),
         &[ImageAnnotation::Blur {
-            rect: PhysicalRect {
-                x: 20,
-                y: 20,
-                width: 60,
-                height: 60,
-            },
+            points: vec![
+                PhysicalPoint { x: 30, y: 30 },
+                PhysicalPoint { x: 70, y: 70 },
+            ],
+            stroke_width: 20,
             radius: 8.0,
-            corner_radius: 8,
         }],
     );
     assert!(output.get_pixel(49, 50)[0] > 60);
     assert!(output.get_pixel(50, 50)[0] < 200);
     assert_eq!(output.get_pixel(10, 50), source.get_pixel(10, 50));
     assert_eq!(output.get_pixel(90, 50), source.get_pixel(90, 50));
+    assert_eq!(output.get_pixel(49, 30), source.get_pixel(49, 30));
+    assert_eq!(output.get_pixel(50, 70), source.get_pixel(50, 70));
+}
+
+#[test]
+fn blur_dabs_are_round_and_repeated_strokes_sample_frozen_pixels() {
+    let source = image::RgbaImage::from_fn(100, 100, |x, y| {
+        let value = if (x + y) % 2 == 0 { 0 } else { 255 };
+        image::Rgba([value, value, value, 255])
+    });
+    let stroke = ImageAnnotation::Blur {
+        points: vec![PhysicalPoint { x: 50, y: 50 }],
+        stroke_width: 20,
+        radius: 4.0,
+    };
+    let once = compose(source.clone(), &[stroke.clone()]);
+    assert!(once.get_pixel(50, 50)[0] > 90 && once.get_pixel(50, 50)[0] < 170);
+    assert_eq!(once.get_pixel(42, 42), source.get_pixel(42, 42));
+    assert_eq!(compose(source.clone(), &[stroke.clone(), stroke]), once);
+    assert_eq!(
+        compose(
+            source.clone(),
+            &[ImageAnnotation::Blur {
+                points: vec![],
+                stroke_width: 20,
+                radius: 4.0,
+            }]
+        ),
+        source
+    );
 }
 
 #[test]

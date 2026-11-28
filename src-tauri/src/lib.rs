@@ -245,8 +245,6 @@ pub fn run() {
             commands::configure_ocr_provider_credentials,
             commands::create_capture_session,
             commands::list_annotation_font_families,
-            commands::last_annotation_tool,
-            commands::remember_annotation_tool,
             commands::begin_scrolling_capture,
             commands::get_scrolling_capture,
             commands::capture_scrolling_frame,

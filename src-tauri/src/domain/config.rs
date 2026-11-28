@@ -71,6 +71,7 @@ pub struct ScreenshotSettings {
     pub auto_copy: bool,
     pub default_stroke_width: u8,
     pub default_font_size: u8,
+    // Legacy serialized preference; tool selection now lives within one capture.
     pub remember_last_tool: bool,
     pub show_selection_size: bool,
     pub show_magnifier: bool,
@@ -102,7 +103,7 @@ impl Default for ScreenshotSettings {
             auto_copy: false,
             default_stroke_width: 2,
             default_font_size: 24,
-            remember_last_tool: true,
+            remember_last_tool: false,
             show_selection_size: true,
             show_magnifier: false,
             magnifier_zoom: 12,

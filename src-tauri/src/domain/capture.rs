@@ -343,10 +343,9 @@ pub enum AnnotationCommand {
         corner_radius: f64,
     },
     Blur {
-        rect: LogicalRect,
+        points: Vec<LogicalPoint>,
+        stroke_width: u32,
         radius: f64,
-        #[serde(default)]
-        corner_radius: f64,
     },
     Spotlight {
         rect: LogicalRect,

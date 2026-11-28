@@ -174,7 +174,7 @@ describe('capture workspace runtime', () => {
     await vi.waitFor(() => expect(platform.commands.outputCapture).toHaveBeenCalledWith(expect.objectContaining({ action: { type: 'copy' }, rect: { ...selection, x: 25 } })));
     runtime.dispose();
   });
-  it('changes hovered blur strength with Ctrl wheel and changes defaults on empty space', async () => {
+  it('changes blur brush size with Ctrl wheel while keeping its strength', async () => {
     const platform = createPlatform();
     const runtime = createCaptureWorkspaceRuntime({ platform });
     await runtime.actions.startSession('screenshot', 'session-1');
@@ -186,13 +186,13 @@ describe('capture workspace runtime', () => {
     runtime.actions.toggleAnnotationTool('rectangle');
     expect(runtime.renderState.selectedAnnotationIndex).toBeNull();
     expect(runtime.actions.wheel({ point: { x: 40, y: 50 }, deltaY: -120, ctrlKey: true })).toBe(true);
-    expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({ type: 'blur', radius: 19 });
-    expect(runtime.renderState.annotationStyle.strokeWidth).toBe(2);
+    expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({ type: 'blur', stroke_width: 30, radius: 16 });
+    expect(runtime.renderState.annotationStyle.strokeWidth).toBe(6);
     runtime.actions.undoAnnotation();
-    expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({ radius: 16 });
+    expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({ stroke_width: 18, radius: 16 });
     runtime.actions.toggleAnnotationTool('blur');
     runtime.actions.wheel({ point: { x: 130, y: 100 }, deltaY: -120 });
-    expect(runtime.renderState.annotationStyle.blurRadius).toBe(20);
+    expect(runtime.renderState.annotationStyle.strokeWidth).toBe(7);
     expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({ radius: 16 });
     runtime.actions.toggleAnnotationTool('text');
     runtime.actions.pointerDown({ point: { x: 80, y: 70 }, source: 'preview' });
@@ -1684,7 +1684,7 @@ describe('capture workspace runtime', () => {
     ['manual', true],
     ['preview', false],
     ['preview', true],
-  ] as const)('honors tool memory across %s captures (remember: %s)', async (entry, rememberLastTool) => {
+  ] as const)('keeps tools within a %s capture and starts fresh despite legacy memory: %s', async (entry, rememberLastTool) => {
     const platform = createPlatform();
     platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
       createSession({ id: sessionId }),
@@ -1733,7 +1733,6 @@ describe('capture workspace runtime', () => {
 
     runtime.actions.toggleAnnotationTool('mosaic');
     for (let index = 0; index < 2; index++) {
-      runtime.actions.toggleAnnotationTool('mosaic');
       runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
       runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
       await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
@@ -1745,55 +1744,45 @@ describe('capture workspace runtime', () => {
 
     await runtime.actions.cancelSession();
     await enterEditor('session-2');
-    expect(runtime.renderState.activeAnnotationTool).toBe(rememberLastTool ? 'mosaic' : 'rectangle');
+    expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
     expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
   });
 
-  it('restores the last tool when the native capture window is recreated and waits for pending tool writes', async () => {
+  it('keeps blur active for continuous strokes and dabs, including undo and redo', async () => {
     const platform = createPlatform();
-    let remembered: import('./annotationStyle').AnnotationTool = 'rectangle';
-    const write = deferred<void>();
-    const rememberAnnotationTool = vi.fn(async (tool: typeof remembered) => {
-      if (tool === 'blur') await write.promise;
-      remembered = tool;
-    });
-    const nativePlatform = {
-      ...platform,
-      commands: {
-        ...platform.commands,
-        lastAnnotationTool: async () => remembered,
-        rememberAnnotationTool,
-      },
-    };
-    const preferences = {
-      format: 'png' as const, quality: 90, namingRule: 'timestamp' as const,
-      customFileName: 'SnapLingo', autoCopy: false, defaultStrokeWidth: 2,
-      defaultFontSize: 24, rememberLastTool: true, showSelectionSize: true,
-      showMagnifier: false,
-    };
-    const create = () => createCaptureWorkspaceRuntime({ platform: nativePlatform, screenshotPreferences: () => preferences });
-    const runtime = create();
-    await runtime.actions.startSession('screenshot', 'session-1');
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-blur');
     await runtime.actions.renderSelectionPreview(selection);
     runtime.actions.toggleAnnotationTool('blur');
-    runtime.actions.selectMoveTool();
-    await runtime.actions.cancelSession();
-    const starting = runtime.actions.startSession('screenshot', 'session-2');
-    await vi.waitFor(() => expect(rememberAnnotationTool).toHaveBeenCalledWith('blur'));
-    expect(runtime.renderState.status).toBe('loading');
-    write.resolve();
-    await starting;
+    runtime.actions.pointerDown({ point: { x: 35, y: 45 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 55, y: 55 } });
+    await runtime.actions.pointerUp({ point: { x: 65, y: 75 } });
+    runtime.actions.pointerDown({ point: { x: 85, y: 75 }, source: 'preview' });
+    await runtime.actions.pointerUp({ point: { x: 85, y: 75 } });
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([
+      { type: 'blur', points: [{ x: 15, y: 15 }, { x: 35, y: 25 }, { x: 45, y: 45 }], stroke_width: 18, radius: 16 },
+      { type: 'blur', points: [{ x: 65, y: 45 }], stroke_width: 18, radius: 16 },
+    ]);
+    runtime.actions.undoAnnotation();
+    expect(runtime.renderState.annotationHistory.annotations).toHaveLength(1);
+    runtime.actions.redoAnnotation();
+    expect(runtime.renderState.annotationHistory.annotations).toHaveLength(2);
+    expect(runtime.renderState.activeAnnotationTool).toBe('blur');
     await runtime.actions.renderSelectionPreview(selection);
     expect(runtime.renderState.activeAnnotationTool).toBe('blur');
     runtime.dispose();
+  });
 
-    const recreated = create();
-    await recreated.actions.startSession('screenshot', 'session-3');
-    await recreated.actions.renderSelectionPreview(selection);
-    expect(recreated.renderState.activeAnnotationTool).toBe('blur');
-    preferences.rememberLastTool = false;
-    await recreated.actions.cancelSession();
-    await recreated.actions.startSession('screenshot', 'session-4');
+  it('starts with rectangle after recreating the capture window', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('blur');
+    runtime.dispose();
+
+    const recreated = createCaptureWorkspaceRuntime({ platform });
+    await recreated.actions.startSession('screenshot', 'session-2');
     await recreated.actions.renderSelectionPreview(selection);
     expect(recreated.renderState.activeAnnotationTool).toBe('rectangle');
     recreated.dispose();

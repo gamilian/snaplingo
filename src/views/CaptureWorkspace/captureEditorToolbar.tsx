@@ -99,7 +99,6 @@ const ANNOTATION_TOOL_BUTTONS: AnnotationToolButton[] = [
     icon: <EraserIcon />,
   },
   { tool: "highlight", title: "Highlighter", ariaLabel: "Draw highlight annotation", icon: <EffectIcon kind="highlight" /> },
-  { tool: "spotlight", title: "Spotlight", ariaLabel: "Spotlight an area", icon: <EffectIcon kind="spotlight" /> },
 ];
 
 const REDACTION_TOOLS: AnnotationToolButton[] = [
@@ -109,7 +108,7 @@ const REDACTION_TOOLS: AnnotationToolButton[] = [
     ariaLabel: "Draw mosaic annotation",
     icon: <MosaicIcon />,
   },
-  { tool: "blur", title: "Blur", ariaLabel: "Blur an area", icon: <EffectIcon kind="blur" /> },
+  { tool: "blur", title: "Blur", ariaLabel: "Paint blur annotation", icon: <EffectIcon kind="blur" /> },
 ];
 
 const SHAPE_TOOLS: AnnotationToolButton[] = [
@@ -198,11 +197,11 @@ export function CaptureEditorToolbar({
     kind: "stroke" | "font";
     value: number;
   } | null>(null);
-  const roundableTypes = ['rectangle', 'region-highlight', 'blur', 'spotlight'];
+  const roundableTypes = ['rectangle', 'region-highlight', 'spotlight'];
   const hasCornerControl = roundableTypes.includes(activeAnnotationTool ?? '') || roundableTypes.includes(selectedAnnotationType ?? '');
   const hasBlurControl = activeAnnotationTool === 'blur' || selectedAnnotationType === 'blur';
-  const sizeValue = isTextSizingActive ? textFontSize : hasBlurControl ? annotationStyle.blurRadius ?? DEFAULT_BLUR_RADIUS : annotationStyle.strokeWidth;
-  const sizeLabel = isTextSizingActive ? 'Text font size' : hasBlurControl ? 'Annotation blur radius' : 'Annotation stroke width';
+  const sizeValue = isTextSizingActive ? textFontSize : annotationStyle.strokeWidth;
+  const sizeLabel = isTextSizingActive ? 'Text font size' : 'Annotation stroke width';
 
   const handleSaveClick = (event: MouseEvent<HTMLButtonElement>) => {
     const action = getSaveCapturePointerAction(event);
@@ -462,10 +461,10 @@ export function CaptureEditorToolbar({
           className="h-7 w-[86px] accent-accent disabled:opacity-40"
           type="range"
           min={
-            isTextSizingActive ? Math.min(MIN_TEXT_FONT_SIZE, textFontSize) : hasBlurControl ? MIN_BLUR_RADIUS : MIN_ANNOTATION_STROKE_WIDTH
+            isTextSizingActive ? Math.min(MIN_TEXT_FONT_SIZE, textFontSize) : MIN_ANNOTATION_STROKE_WIDTH
           }
           max={
-            isTextSizingActive ? Math.max(MAX_TEXT_FONT_SIZE, textFontSize) : hasBlurControl ? MAX_BLUR_RADIUS : MAX_ANNOTATION_STROKE_WIDTH
+            isTextSizingActive ? Math.max(MAX_TEXT_FONT_SIZE, textFontSize) : MAX_ANNOTATION_STROKE_WIDTH
           }
           step={1}
           value={sizeValue}
@@ -478,10 +477,6 @@ export function CaptureEditorToolbar({
           }
           onInput={(event) => {
             const value = Number(event.currentTarget.value);
-            if (hasBlurControl && !isTextSizingActive) {
-              onApplyAnnotationStyle({ ...annotationStyle, blurRadius: value }, textFontSize);
-              return;
-            }
             pendingSizeDefaultRef.current = {
               kind: isTextSizingActive ? "font" : "stroke",
               value,
@@ -542,7 +537,7 @@ export function CaptureEditorToolbar({
       >
         ESC
       </button>
-      {(isTextSizingActive || hasCornerControl) && (
+      {(isTextSizingActive || hasCornerControl || hasBlurControl) && (
         <IconActionButton
           className={getCaptureEditorIconButtonClassName(openPicker === "properties")}
           disabled={isRenderingOutput}
@@ -554,7 +549,7 @@ export function CaptureEditorToolbar({
           ···
         </IconActionButton>
       )}
-      {openPicker === "properties" && (isTextSizingActive || hasCornerControl) && (
+      {openPicker === "properties" && (isTextSizingActive || hasCornerControl || hasBlurControl) && (
         <div
           className="absolute left-0 flex w-full flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-xs text-ink shadow-lg"
           style={position.y + 120 * uiScale > window.innerHeight ? { bottom: 'calc(100% + 8px)' } : { top: 'calc(100% + 8px)' }}
@@ -579,6 +574,10 @@ export function CaptureEditorToolbar({
               <button type="button" className="h-7 w-7 rounded border border-line hover:bg-raised" aria-label="Increase text font size" onClick={() => { const size = nextTextFontSize(textFontSize, 'increase', 2); onApplyAnnotationStyle(annotationStyle, size); if (textDraftActive) onTextDraftFontSizeChange(size); }}>+</button>
             </div>
           </>}
+          {hasBlurControl && <label className="flex items-center gap-2">模糊强度
+            <input type="range" min={MIN_BLUR_RADIUS} max={MAX_BLUR_RADIUS} step={1} value={annotationStyle.blurRadius ?? DEFAULT_BLUR_RADIUS} aria-label="Annotation blur radius" onInput={(event) => onApplyAnnotationStyle({ ...annotationStyle, blurRadius: Number(event.currentTarget.value) }, textFontSize)} />
+            <span>{annotationStyle.blurRadius ?? DEFAULT_BLUR_RADIUS}</span>
+          </label>}
           {hasCornerControl && <label className="flex items-center gap-2">圆角
             <input type="range" min={0} max={100} step={1} value={annotationStyle.cornerRadius ?? 0} aria-label="Annotation corner radius" onInput={(event) => onApplyAnnotationStyle({ ...annotationStyle, cornerRadius: Number(event.currentTarget.value) }, textFontSize)} />
             <span>{annotationStyle.cornerRadius ?? 0}</span>
@@ -1199,10 +1198,9 @@ function ToolPicker({
   );
 }
 
-function EffectIcon({ kind }: { kind: 'highlight' | 'blur' | 'spotlight' }) {
+function EffectIcon({ kind }: { kind: 'highlight' | 'blur' }) {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
     {kind === 'highlight' ? <><path d="m6 14 8-8 4 4-8 8-4-4Z" /><path d="m4 20 3-4 3 3-4 3" /></> : <rect x="4" y="5" width="16" height="14" rx="3" />}
     {kind === 'blur' && <path d="M7 8h10M7 12h10M7 16h10M9 7v10M15 7v10" opacity="0.5" />}
-    {kind === 'spotlight' && <><circle cx="12" cy="12" r="4" /><path d="M4 5h16v14H4z" fill="currentColor" opacity="0.25" /></>}
   </svg>;
 }

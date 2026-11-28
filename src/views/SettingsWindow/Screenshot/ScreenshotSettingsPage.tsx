@@ -285,13 +285,6 @@ export function ScreenshotSettingsPage() {
         </SettingRow>
       </SettingsGroup>
       <SettingsGroup>
-        <SettingRow label="记住上次标注工具" description="本次运行内沿用上次工具；关闭后每次从矩形开始。">
-          <SettingsToggle
-            label="记住上次标注工具"
-            checked={screenshot.rememberLastTool}
-            onChange={(rememberLastTool) => updateScreenshot({ rememberLastTool })}
-          />
-        </SettingRow>
         <SettingRow label="显示选区尺寸">
           <SettingsToggle
             label="显示选区尺寸"

@@ -387,13 +387,18 @@ fn image_annotations_from_commands(
                 corner_radius: (*corner_radius * output_scale).round().max(0.0) as u32,
             }),
             AnnotationCommand::Blur {
-                rect,
+                points,
+                stroke_width,
                 radius,
-                corner_radius,
             } => Ok(ImageAnnotation::Blur {
-                rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
+                points: points
+                    .iter()
+                    .map(|point| {
+                        scaled_logical_point_relative_to(point, &annotation_origin, output_scale)
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+                stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
                 radius: (*radius * output_scale) as f32,
-                corner_radius: (*corner_radius * output_scale).round().max(0.0) as u32,
             }),
             AnnotationCommand::Spotlight {
                 rect,
@@ -1078,6 +1083,14 @@ mod tests {
                     bold: false,
                     italic: false,
                 },
+                AnnotationCommand::Blur {
+                    points: vec![
+                        LogicalPoint { x: 2.0, y: 3.0 },
+                        LogicalPoint { x: 6.0, y: 8.0 },
+                    ],
+                    stroke_width: 12,
+                    radius: 4.0,
+                },
             ],
             &LogicalRect {
                 x: 100.0,
@@ -1089,7 +1102,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(annotations.len(), 8);
+        assert_eq!(annotations.len(), 9);
         assert_eq!(
             annotations[0],
             ImageAnnotation::Rectangle {
@@ -1173,6 +1186,14 @@ mod tests {
                 font_family: String::new(),
                 bold: false,
                 italic: false,
+            }
+        );
+        assert_eq!(
+            annotations[8],
+            ImageAnnotation::Blur {
+                points: vec![PhysicalPoint { x: 4, y: 6 }, PhysicalPoint { x: 12, y: 16 }],
+                stroke_width: 24,
+                radius: 8.0,
             }
         );
     }

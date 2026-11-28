@@ -9,6 +9,7 @@ const MAX_PIXELS: usize = 50_000_000;
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum ScrollingStep {
     Appended(usize),
+    Retracted(usize),
     Still,
     Failed,
     Limit,
@@ -27,6 +28,7 @@ pub(super) struct ScrollingImage {
     header: Vec<Box<[u8]>>,
     footer: Vec<Box<[u8]>>,
     previous: RgbaImage,
+    // Current viewport displacement from the initial viewport, in body rows.
     offset: i64,
     initialized: bool,
     history: Vec<Segment>,
@@ -139,14 +141,21 @@ impl ScrollingImage {
         }
         let body_height = self.frame_height as usize - top - bottom;
         let next_offset = self.offset + delta;
-        let prepend = next_offset < 0;
-        let added = if prepend {
-            (-next_offset) as usize
+        let retained_offset = if self.offset.signum() == next_offset.signum() {
+            if next_offset.unsigned_abs() < self.offset.unsigned_abs() {
+                next_offset
+            } else {
+                self.offset
+            }
         } else {
-            (next_offset + body_height as i64 - self.rows.len() as i64).max(0) as usize
+            0
         };
-        let requested = added;
-        let added = added.min(self.max_height - self.dimensions().1 as usize);
+        let removed = (self.offset.unsigned_abs() - retained_offset.unsigned_abs()) as usize;
+        self.retract_rows(removed);
+        self.offset = retained_offset;
+        let prepend = next_offset < 0;
+        let requested = (next_offset - retained_offset).unsigned_abs() as usize;
+        let added = requested.min(self.max_height - self.dimensions().1 as usize);
         if added > 0 {
             let new_rows = if prepend {
                 frame_rows(&frame, top + requested - added, top + requested)
@@ -169,17 +178,45 @@ impl ScrollingImage {
             } else {
                 self.rows.extend(new_rows);
             }
+            self.offset += if prepend {
+                -(added as i64)
+            } else {
+                added as i64
+            };
         }
-        self.offset = next_offset
-            .max(0)
-            .min((self.rows.len() - body_height) as i64);
+        debug_assert_eq!(
+            self.rows.len(),
+            body_height + self.offset.unsigned_abs() as usize
+        );
         self.previous = frame;
         if self.at_limit() {
             ScrollingStep::Limit
         } else if added > 0 {
             ScrollingStep::Appended(added)
+        } else if removed > 0 {
+            ScrollingStep::Retracted(removed)
         } else {
             ScrollingStep::Still
+        }
+    }
+
+    fn retract_rows(&mut self, rows: usize) {
+        if self.offset < 0 {
+            self.rows.drain(..rows);
+        } else {
+            self.rows.truncate(self.rows.len() - rows);
+        }
+        // Reverse scrolling can remove several append operations or only part
+        // of the latest one. Undo must describe the rows that still remain.
+        let mut remaining = rows;
+        while remaining > 0 {
+            let segment = self.history.last_mut().expect("appended rows have history");
+            let removed = remaining.min(segment.rows);
+            segment.rows -= removed;
+            remaining -= removed;
+            if segment.rows == 0 {
+                self.history.pop();
+            }
         }
     }
 
@@ -188,9 +225,11 @@ impl ScrollingImage {
             return false;
         };
         // A stationary page must not immediately re-add the undone segment.
-        let hashes = row_hashes(&self.previous);
-        self.ignored_frame =
-            Some(hashes[self.header.len()..hashes.len() - self.footer.len()].to_vec());
+        if self.ignored_frame.is_none() {
+            let hashes = row_hashes(&self.previous);
+            self.ignored_frame =
+                Some(hashes[self.header.len()..hashes.len() - self.footer.len()].to_vec());
+        }
         for _ in 0..segment.rows {
             if segment.prepend {
                 self.rows.pop_front();
@@ -207,7 +246,7 @@ impl ScrollingImage {
         for row in self
             .rows
             .iter()
-            .skip(self.offset as usize)
+            .skip(self.offset.max(0) as usize)
             .take(body_height)
         {
             pixels.extend_from_slice(row);
@@ -525,19 +564,98 @@ mod tests {
         assert_eq!(image.push(page(50, 10, 10)), ScrollingStep::Appended(20));
         assert_eq!(image.dimensions(), (64, 120));
         assert_eq!(image.push(page(10, 10, 10)), ScrollingStep::Appended(20));
-        assert_eq!(image.dimensions(), (64, 140));
+        assert_eq!(image.dimensions(), (64, 120));
         let output = image.image();
         assert_eq!(output.get_pixel(20, 0).0, [20, 40, 160, 255]);
-        assert_eq!(output.get_pixel(20, 139).0, [160, 40, 20, 255]);
+        assert_eq!(output.get_pixel(20, 119).0, [160, 40, 20, 255]);
         assert_eq!(output.get_pixel(20, 10), page(10, 10, 10).get_pixel(20, 10));
     }
 
     #[test]
-    fn does_not_duplicate_content_when_scrolling_inside_an_already_captured_area() {
+    fn scrolling_back_retracts_rows_and_scrolling_forward_extends_from_that_point() {
         let mut image = ScrollingImage::new(page(0, 0, 0)).unwrap();
         assert_eq!(image.push(page(30, 0, 0)), ScrollingStep::Appended(30));
-        assert_eq!(image.push(page(10, 0, 0)), ScrollingStep::Still);
-        assert_eq!(image.dimensions(), (64, 130));
+        assert_eq!(image.push(page(10, 0, 0)), ScrollingStep::Retracted(20));
+        assert_eq!(image.dimensions(), (64, 110));
+        assert_eq!(
+            image.image().get_pixel(8, 109),
+            page(10, 0, 0).get_pixel(8, 99)
+        );
+        assert_eq!(image.push(page(25, 0, 0)), ScrollingStep::Appended(15));
+        assert_eq!(image.dimensions(), (64, 125));
+        assert!(image.undo());
+        assert_eq!(image.dimensions(), (64, 110));
+        assert!(image.undo());
+        assert_eq!(image.image(), page(0, 0, 0));
+    }
+
+    #[test]
+    fn reverse_scrolling_retracts_multiple_segments_and_preserves_fixed_edges() {
+        for upward in [false, true] {
+            let position = |offset: u32| if upward { 100 - offset } else { 100 + offset };
+            let original = page(100, 10, 10);
+            let mut image = ScrollingImage::new(original.clone()).unwrap();
+            for offset in [20, 40, 60] {
+                assert_eq!(
+                    image.push(page(position(offset), 10, 10)),
+                    ScrollingStep::Appended(20)
+                );
+            }
+            assert_eq!(
+                image.push(page(position(25), 10, 10)),
+                ScrollingStep::Retracted(35)
+            );
+            assert_eq!(image.dimensions(), (64, 125));
+            let output = image.image();
+            assert_eq!(output.get_pixel(8, 0), original.get_pixel(8, 0));
+            assert_eq!(output.get_pixel(8, 124), original.get_pixel(8, 99));
+            assert!(image.undo());
+            assert_eq!(image.dimensions(), (64, 120));
+            assert_eq!(image.push(page(position(25), 10, 10)), ScrollingStep::Still);
+            image.push(original.clone());
+            assert_eq!(image.image(), original);
+            assert!(!image.can_undo());
+        }
+    }
+
+    #[test]
+    fn crossing_the_initial_position_keeps_only_the_current_range_without_gaps() {
+        let source = RgbaImage::from_fn(64, 1000, |x, y| {
+            image::Rgba([
+                ((y * 13 + x * 7) % 251) as u8,
+                ((y * 29 + x * 3) % 253) as u8,
+                ((y * 3 + x * 11) % 249) as u8,
+                255,
+            ])
+        });
+        let frame = |position| image::imageops::crop_imm(&source, 0, position, 64, 100).to_image();
+        let mut image = ScrollingImage::new(frame(500)).unwrap();
+        for position in [530u32, 550, 510, 490, 450, 480, 520, 500] {
+            let result = image.push(frame(position));
+            assert_ne!(result, ScrollingStep::Failed);
+            let expected = image::imageops::crop_imm(
+                &source,
+                0,
+                500.min(position),
+                64,
+                100 + position.abs_diff(500),
+            )
+            .to_image();
+            assert_eq!(image.image(), expected, "viewport position: {position}");
+        }
+        assert!(!image.can_undo());
+    }
+
+    #[test]
+    fn repeated_undo_ignores_the_actual_stationary_page_until_it_moves() {
+        let mut image = ScrollingImage::new(page(0, 0, 0)).unwrap();
+        image.push(page(20, 0, 0));
+        image.push(page(40, 0, 0));
+        assert!(image.undo());
+        assert!(image.undo());
+        assert_eq!(image.push(page(40, 0, 0)), ScrollingStep::Still);
+        assert_eq!(image.image(), page(0, 0, 0));
+        assert_eq!(image.push(page(10, 0, 0)), ScrollingStep::Appended(10));
     }
 
     #[test]

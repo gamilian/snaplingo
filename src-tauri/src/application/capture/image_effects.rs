@@ -96,32 +96,6 @@ pub(super) fn highlight_region(
     }
 }
 
-pub(super) fn blur_region(
-    output: &mut image::RgbaImage,
-    rect: &PhysicalRect,
-    radius: f32,
-    corner: u32,
-) {
-    let radius = radius.clamp(0.1, 256.0);
-    let (x0, y0, x1, y1) = bounds(output, rect, (radius * 3.0).ceil() as u32);
-    if x0 >= x1 || y0 >= y1 {
-        return;
-    }
-    let cropped = image::imageops::crop_imm(output, x0, y0, x1 - x0, y1 - y0).to_image();
-    let blurred = image::imageops::blur(&cropped, radius);
-    let (left, top, right, bottom) = bounds(output, rect, 0);
-    for y in top..bottom {
-        for x in left..right {
-            let amount = coverage(rect, x, y, corner as f32);
-            blend(
-                output.get_pixel_mut(x, y),
-                blurred.get_pixel(x - x0, y - y0).0,
-                amount,
-            );
-        }
-    }
-}
-
 pub(super) fn apply_spotlights(
     output: &mut image::RgbaImage,
     original: &image::RgbaImage,

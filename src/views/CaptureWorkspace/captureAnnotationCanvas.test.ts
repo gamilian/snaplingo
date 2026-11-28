@@ -70,13 +70,15 @@ describe('capture annotation canvas', () => {
     vi.spyOn(buffer, 'getContext').mockReturnValue(bufferContext as never);
     const context = {
       canvas: source, getTransform: () => ({ a: 2 }), save: vi.fn(), restore: vi.fn(),
-      beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(), drawImage: vi.fn(),
+      beginPath: vi.fn(), moveTo: vi.fn(), arc: vi.fn(), clip: vi.fn(), drawImage: vi.fn(),
     } as unknown as CanvasRenderingContext2D;
-    drawCaptureAnnotation(context, { type: 'blur', rect: { x: 20, y: 20, width: 20, height: 20 }, radius: 8 }, { source, mosaic: buffer });
+    drawCaptureAnnotation(context, { type: 'blur', points: [{ x: 30, y: 30 }], stroke_width: 20, radius: 8 }, { source, mosaic: buffer });
     expect(bufferContext.getImageData).toHaveBeenCalledWith(0, 0, 128, 128);
     expect(bufferContext.putImageData).toHaveBeenCalledOnce();
     expect(context.clip).toHaveBeenCalledOnce();
-    expect(context.drawImage).toHaveBeenCalledWith(buffer, 0, 0, 100, 100);
+    expect(context.drawImage).toHaveBeenCalledWith(buffer, 0, 0, 64, 64);
+    expect(context.arc).toHaveBeenCalledWith(30, 30, 10, 0, Math.PI * 2);
+    expect(bufferContext.drawImage).toHaveBeenCalledExactlyOnceWith(source, 0, 0, 128, 128, 0, 0, 128, 128);
     expect('filter' in context).toBe(false);
   });
 
@@ -166,7 +168,7 @@ describe('capture annotation canvas', () => {
     );
   });
 
-  it('rasterizes only newly added draft mosaic segments while the pointer moves', async () => {
+  it.each(['mosaic', 'blur'] as const)('rasterizes only newly added draft %s segments while the pointer moves', async (tool) => {
     const sourceContext = {
       setTransform: vi.fn(), clearRect: vi.fn(), drawImage: vi.fn(),
       getTransform: vi.fn(() => ({ a: 1 })),
@@ -182,7 +184,7 @@ describe('capture annotation canvas', () => {
       setTransform: vi.fn(), clearRect: vi.fn(), save: vi.fn(), restore: vi.fn(),
       beginPath: vi.fn(), moveTo: vi.fn(), arc: vi.fn(), clip: vi.fn(),
       drawImage: vi.fn(), getTransform: vi.fn(() => ({ a: 1 })),
-      imageSmoothingEnabled: true,
+      imageSmoothingEnabled: true, filter: 'none',
     };
     const mosaicBufferContext = {
       clearRect: vi.fn(), drawImage: vi.fn(), imageSmoothingEnabled: true,
@@ -190,8 +192,8 @@ describe('capture annotation canvas', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
       if (this.hasAttribute('data-capture-preview')) return sourceContext as never;
       if (this.hasAttribute('data-capture-draft')) return draftContext as never;
-      if (this.hasAttribute('data-capture-mosaic-buffer') || this.width < 200) return mosaicBufferContext as never;
-      return annotationContext as never;
+      if (this.hasAttribute('data-capture-annotations')) return annotationContext as never;
+      return mosaicBufferContext as never;
     });
 
     const desktop = document.createElement('div');
@@ -199,9 +201,9 @@ describe('capture annotation canvas', () => {
     image.dataset.captureMonitor = 'monitor';
     desktop.append(image);
     const selection = { x: 0, y: 0, width: 200, height: 80 };
-    const mosaic = (points: Array<{ x: number; y: number }>): AnnotationCommand => ({
-      type: 'mosaic', points, stroke_width: 4, block_size: 2,
-    });
+    const brush = (points: Array<{ x: number; y: number }>): AnnotationCommand => tool === 'mosaic'
+      ? { type: tool, points, stroke_width: 4, block_size: 2 }
+      : { type: tool, points, stroke_width: 4, radius: 4 };
     const props = {
       desktopRef: { current: desktop },
       monitors: [{ id: 'monitor', logical_bounds: selection, physical_bounds: selection, scale_factor: 1, image_base64: '' }],
@@ -212,17 +214,18 @@ describe('capture annotation canvas', () => {
     const root = createRoot(container);
     try {
       await act(async () => root.render(createElement(CaptureAnnotationCanvas, {
-        ...props, draftAnnotation: mosaic([{ x: 10, y: 10 }]),
+        ...props, draftAnnotation: brush([{ x: 10, y: 10 }]),
       })));
       await act(async () => root.render(createElement(CaptureAnnotationCanvas, {
-        ...props, draftAnnotation: mosaic([{ x: 10, y: 10 }, { x: 20, y: 10 }]),
+        ...props, draftAnnotation: brush([{ x: 10, y: 10 }, { x: 20, y: 10 }]),
       })));
       await act(async () => root.render(createElement(CaptureAnnotationCanvas, {
-        ...props, draftAnnotation: mosaic([{ x: 10, y: 10 }, { x: 20, y: 10 }, { x: 30, y: 10 }]),
+        ...props, draftAnnotation: brush([{ x: 10, y: 10 }, { x: 20, y: 10 }, { x: 30, y: 10 }]),
       })));
 
       expect(mosaicBufferContext.drawImage).toHaveBeenCalledTimes(3);
-      expect(mosaicBufferContext.drawImage.mock.calls.map((call) => call[3])).toEqual([4, 14, 14]);
+      expect(mosaicBufferContext.drawImage.mock.calls.map((call) => call[3])).toEqual(tool === 'mosaic' ? [4, 14, 14] : [24, 34, 38]);
+      expect(sourceContext.drawImage).toHaveBeenCalledOnce();
     } finally {
       await act(async () => root.unmount());
     }

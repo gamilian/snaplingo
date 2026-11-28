@@ -39,16 +39,50 @@ describe("CaptureWorkspaceView runtime seam", () => {
     await act(async () => root.render(createElement(CaptureWorkspaceView, {
       renderState: createRenderState(), actions,
     })));
+    expect(container.querySelector('[aria-label="Spotlight an area"]')).toBeNull();
     expect(container.querySelector('[aria-label="Highlight an area"]')).toBeNull();
     expect(container.querySelector('[aria-label="Draw highlight annotation"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Blur an area"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Paint blur annotation"]')).toBeNull();
     const group = container.querySelector<HTMLButtonElement>('button[aria-label="Mosaic / Blur"]');
     await act(async () => group!.click());
     expect(actions.toggleAnnotationTool).toHaveBeenCalledWith("mosaic");
-    const blur = container.querySelector<HTMLButtonElement>('button[aria-label="Blur an area"]');
+    const blur = container.querySelector<HTMLButtonElement>('button[aria-label="Paint blur annotation"]');
     await act(async () => blur!.click());
     expect(actions.toggleAnnotationTool).toHaveBeenCalledWith("blur");
     expect(container.querySelector('[role="menu"][aria-label="Mosaic / Blur"]')).toBeNull();
+  });
+
+  it("adjusts blur brush size separately from strength", async () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    mountedRoots.push({ container, root });
+    const actions = createActions();
+    const state = createRenderState();
+    await act(async () => root.render(createElement(CaptureWorkspaceView, {
+      renderState: { ...state, editor: {
+        ...state.editor, activeAnnotationTool: "blur",
+        annotationStyle: { ...DEFAULT_ANNOTATION_STYLE, blurRadius: 12 },
+      }, toolbar: { ...state.toolbar, isTextSizingActive: false } }, actions,
+    })));
+    const size = container.querySelector<HTMLInputElement>('[aria-label="Annotation stroke width"]')!;
+    expect(size).not.toBeNull();
+    await act(async () => {
+      size.value = '6';
+      size.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(actions.applySelectedAnnotationStyle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ strokeWidth: 6, blurRadius: 12 }), expect.any(Number),
+    );
+    await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Annotation properties"]')!.click());
+    expect(container.querySelector('[aria-label="Annotation corner radius"]')).toBeNull();
+    const strength = container.querySelector<HTMLInputElement>('[aria-label="Annotation blur radius"]')!;
+    await act(async () => {
+      strength.value = '24';
+      strength.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(actions.applySelectedAnnotationStyle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ strokeWidth: 2, blurRadius: 24 }), expect.any(Number),
+    );
   });
 
   it("opens optional annotation properties only when requested", async () => {

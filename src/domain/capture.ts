@@ -181,9 +181,9 @@ export interface RegionHighlightAnnotationCommand {
 
 export interface BlurAnnotationCommand {
   type: 'blur';
-  rect: LogicalRect;
+  points: Point[];
+  stroke_width: number;
   radius: number;
-  corner_radius?: number;
 }
 
 export interface SpotlightAnnotationCommand {

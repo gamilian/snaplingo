@@ -87,9 +87,9 @@ pub enum ImageAnnotation {
         corner_radius: u32,
     },
     Blur {
-        rect: PhysicalRect,
+        points: Vec<PhysicalPoint>,
+        stroke_width: u32,
         radius: f32,
-        corner_radius: u32,
     },
     Spotlight {
         rect: PhysicalRect,
@@ -567,10 +567,10 @@ fn draw_annotation(
             corner_radius,
         } => super::image_effects::highlight_region(output, rect, *color, *corner_radius),
         ImageAnnotation::Blur {
-            rect,
+            points,
+            stroke_width,
             radius,
-            corner_radius,
-        } => super::image_effects::blur_region(output, rect, *radius, *corner_radius),
+        } => draw_blur_annotation(output, source, points, *stroke_width, *radius),
         ImageAnnotation::Spotlight { .. } => {}
     }
 }
@@ -887,6 +887,38 @@ fn draw_mosaic_annotation(
         }
 
         y += block_size;
+    }
+}
+
+fn draw_blur_annotation(
+    output: &mut image::RgbaImage,
+    source: &image::RgbaImage,
+    points: &[PhysicalPoint],
+    stroke_width: u32,
+    radius: f32,
+) {
+    let Some(mask) = rasterize_brush_mask(output, points, stroke_width) else {
+        return;
+    };
+    let radius = radius.clamp(0.1, 256.0);
+    let padding = (radius * 3.0).ceil() as i64;
+    let left = (mask.left - padding).max(0) as u32;
+    let top = (mask.top - padding).max(0) as u32;
+    let right = (mask.right + padding).min(source.width() as i64) as u32;
+    let bottom = (mask.bottom + padding).min(source.height() as i64) as u32;
+    let cropped =
+        image::imageops::crop_imm(source, left, top, right - left, bottom - top).to_image();
+    let blurred = image::imageops::blur(&cropped, radius);
+    for y in mask.top..mask.bottom {
+        for x in mask.left..mask.right {
+            if mask.contains(x, y) {
+                output.put_pixel(
+                    x as u32,
+                    y as u32,
+                    *blurred.get_pixel(x as u32 - left, y as u32 - top),
+                );
+            }
+        }
     }
 }
 

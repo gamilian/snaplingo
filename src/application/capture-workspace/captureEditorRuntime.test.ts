@@ -22,6 +22,7 @@ import {
 } from './captureEditorRuntime';
 import { emptyAnnotationHistory, type AnnotationHistory } from './annotationHistory';
 import type { AnnotationStyle } from './annotationStyle';
+import { applyAnnotationStyle } from './annotationStyle';
 import type { AnnotationCommand } from '../../domain/capture';
 
 const baseStyle: AnnotationStyle = {
@@ -31,6 +32,15 @@ const baseStyle: AnnotationStyle = {
 };
 
 describe('captureEditorRuntime', () => {
+  it('changes a selected blur strength without widening a minimum-size dab', () => {
+    const annotation: AnnotationCommand = {
+      type: 'blur', points: [{ x: 15, y: 20 }], stroke_width: 18, radius: 12,
+    };
+    const toolbar = deriveCaptureEditorToolbarState({ annotationStyle: baseStyle, textFontSize: 24 }, annotation);
+    expect(applyAnnotationStyle(annotation, { ...toolbar.annotationStyle, blurRadius: 24 }))
+      .toEqual({ ...annotation, radius: 24 });
+  });
+
   it('derives toolbar state from annotation-specific fields while preserving unrelated controls', () => {
     expect(
       deriveCaptureEditorToolbarState(

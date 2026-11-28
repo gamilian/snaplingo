@@ -269,7 +269,7 @@ impl CaptureSessionRuntime {
         task.status = ScrollingCaptureStatus::Capturing;
         task.hint = None;
         match task.image.push(frame) {
-            ScrollingStep::Appended(_) => task.preview_dirty = true,
+            ScrollingStep::Appended(_) | ScrollingStep::Retracted(_) => task.preview_dirty = true,
             ScrollingStep::Still => {}
             ScrollingStep::Failed => {
                 task.hint = Some("画面无法匹配，请放慢滚动或滚回上次位置。".into())
