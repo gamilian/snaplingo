@@ -107,7 +107,7 @@ describe('FeatureHotkeysSection keyboard recording', () => {
     await pressKey('r', 'KeyR', { ctrlKey: true, shiftKey: true });
     await releaseKey('r', 'KeyR', { ctrlKey: true, shiftKey: true });
     expect(recorder.updateHotkey).toHaveBeenCalledExactlyOnceWith('screenshot', 'screenshot', '⇧⌘R');
-    expect(recorder.container.querySelector('kbd')?.textContent).toBe('Ctrl');
+    expect(recorder.container.querySelector('button')?.getAttribute('aria-label')).toBe('修改快捷键：Shift + Ctrl + R');
   });
 
   it('records a Windows Win combination as a distinct modifier', async () => {
@@ -117,7 +117,7 @@ describe('FeatureHotkeysSection keyboard recording', () => {
     await pressKey('r', 'KeyR', { metaKey: true });
     await releaseKey('r', 'KeyR', { metaKey: true });
     expect(recorder.updateHotkey).toHaveBeenCalledExactlyOnceWith('screenshot', 'screenshot', '⊞R');
-    expect(recorder.container.querySelector('kbd')?.textContent).toBe('Win');
+    expect(recorder.container.querySelector('button')?.getAttribute('aria-label')).toBe('修改快捷键：Win + R');
   });
 
   it('records on older WebViews without crypto.randomUUID', async () => {

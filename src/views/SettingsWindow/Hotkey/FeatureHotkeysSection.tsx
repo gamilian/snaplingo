@@ -33,11 +33,9 @@ export function FeatureHotkeysSection({
   const endRecording = useHotkeyConfigStore((state) => state.endRecording);
   const subscribeRecordedHotkey = useHotkeyConfigStore((state) => state.subscribeRecordedHotkey);
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
-  const [recordingHint, setRecordingHint] = useState<string | null>(null);
 
   useEffect(() => {
     if (!recordingKey) return;
-    setRecordingHint(null);
     const recordingId = Array.from(
       crypto.getRandomValues(new Uint32Array(4)),
       (value) => value.toString(16),
@@ -97,7 +95,6 @@ export function FeatureHotkeysSection({
         return;
       }
       if (event.repeat || saving) return;
-      setRecordingHint(null);
 
       const modifiers: string[] = [];
       if (event.shiftKey) modifiers.push('⇧');
@@ -190,11 +187,6 @@ export function FeatureHotkeysSection({
           </div>
         ))}
       </div>
-      {isWindowsPlatform() && (
-        <p role="status" className="px-[22px] pb-3 text-hint text-muted">
-          {recordingKey && recordingHint ? recordingHint : '点击组合键重新录制，按 Esc 取消。'}
-        </p>
-      )}
     </>
   );
 }

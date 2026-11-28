@@ -15,27 +15,29 @@ describe('HotkeyDisplay', () => {
     const root = createRoot(container);
     try {
       await act(async () => root.render(createElement(HotkeyDisplay, { value: '⇧⌥⌘F1' })));
-      expect(container.textContent).toBe('Ctrl+Alt+Shift+F1');
-      expect(Array.from(container.querySelectorAll('kbd'), (key) => key.textContent)).toEqual(['Ctrl', 'Alt', 'Shift', 'F1']);
+      expect(container.textContent).toBe('ShiftAltCtrlWinF1');
+      expect(container.querySelector('button')?.getAttribute('aria-label')).toBe('修改快捷键：Shift + Alt + Ctrl + F1');
+      expect(Array.from(container.querySelectorAll('kbd'), (key) => key.textContent)).toEqual(['Shift', 'Alt', 'Ctrl', 'Win']);
     } finally {
       await act(async () => root.unmount());
     }
   });
 
   it.each([
-    ['F1', ['F1']],
-    ['⊞F4', ['Win', 'F4']],
-    ['⌘F1', ['Ctrl', 'F1']],
-    ['⇧F3', ['Shift', 'F3']],
-    ['⌃⌘F3', ['Ctrl', 'F3']],
+    ['F1', []],
+    ['⊞F4', ['Win']],
+    ['⌘F1', ['Ctrl']],
+    ['⇧F3', ['Shift']],
+    ['⌃⌘F3', ['Ctrl']],
     ['未设置', []],
-  ] as const)('shows only the active Windows keys for %s', async (value, keys) => {
+  ] as const)('keeps inactive Windows modifiers dimmed for %s', async (value, keys) => {
     vi.stubGlobal('navigator', { platform: 'Win32' });
     const container = document.createElement('div');
     const root = createRoot(container);
     try {
       await act(async () => root.render(createElement(HotkeyDisplay, { value })));
-      expect(Array.from(container.querySelectorAll('kbd'), (key) => key.textContent)).toEqual(keys);
+      expect(Array.from(container.querySelectorAll('kbd'), (key) => key.textContent)).toEqual(['Shift', 'Alt', 'Ctrl', 'Win']);
+      expect(Array.from(container.querySelectorAll('kbd.text-ink'), (key) => key.textContent)).toEqual(keys);
     } finally {
       await act(async () => root.unmount());
     }
@@ -48,6 +50,26 @@ describe('HotkeyDisplay', () => {
     try {
       await act(async () => root.render(createElement(HotkeyDisplay, { value: '⇧⌥⌘F1' })));
       expect(container.textContent).toBe('⇧⌥⌘⌃F1');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it.each(['Win32', 'MacIntel'])('dims the old shortcut while recording on %s', async (platform) => {
+    vi.stubGlobal('navigator', { platform });
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    const onClick = vi.fn();
+    try {
+      await act(async () => root.render(createElement(HotkeyDisplay, { value: '⇧⌥⌘F1', isRecording: true, onClick })));
+      expect(container.querySelectorAll('kbd.text-faint')).toHaveLength(4);
+      expect(container.querySelectorAll('kbd.text-ink')).toHaveLength(0);
+      expect(container.textContent).toContain('按下快捷键...');
+      expect(container.textContent).not.toContain('F1');
+      const button = container.querySelector('button')!;
+      expect(button.getAttribute('aria-label')).toContain('Esc 取消');
+      button.click();
+      expect(onClick).toHaveBeenCalledOnce();
     } finally {
       await act(async () => root.unmount());
     }

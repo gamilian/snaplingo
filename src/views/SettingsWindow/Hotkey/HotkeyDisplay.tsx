@@ -16,18 +16,18 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
   const hasControl = value.includes('⌃');
   const hasWin = value.includes('⊞');
   const isWindows = typeof navigator !== 'undefined' && navigator.platform.startsWith('Win');
-  const hasWindowsControl = hasCommand || hasControl;
-  const primaryModifierClass = (isWindows ? hasWindowsControl : hasCommand)
-    ? 'text-ink'
-    : 'text-faint';
-  const shiftLabel = isWindows ? 'Shift' : '⇧';
-  const optionLabel = isWindows ? 'Alt' : '⌥';
-  const primaryLabel = isWindows ? 'Ctrl' : '⌘';
+  const modifiers = [
+    { label: isWindows ? 'Shift' : '⇧', active: hasShift },
+    { label: isWindows ? 'Alt' : '⌥', active: hasOption },
+    { label: isWindows ? 'Ctrl' : '⌘', active: isWindows ? hasCommand || hasControl : hasCommand },
+    { label: isWindows ? 'Win' : '⌃', active: isWindows ? hasWin : hasControl },
+  ];
 
   // 提取字母键（最后一个非修饰键字符）
   const letterKey = value.replace(/[⇧⌥⌘⌃⊞]/g, '').trim();
 
   const isUnset = value === "未设置";
+  const activeKeys = [...modifiers.filter(({ active }) => active).map(({ label }) => label), letterKey];
 
   // 统一的容器样式
   const containerClass = `
@@ -41,85 +41,24 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
     }
   `;
 
-  if (isWindows) {
-    const keys = [
-      hasWin ? 'Win' : null,
-      hasWindowsControl ? 'Ctrl' : null,
-      hasOption ? 'Alt' : null,
-      hasShift ? 'Shift' : null,
-      letterKey || null,
-    ].filter((key): key is string => key !== null);
-
-    return (
-      <button
-        type="button"
-        onClick={handleClick}
-        className={containerClass}
-        aria-label={isRecording ? '请按下快捷键，Esc 取消' : isUnset ? '设置快捷键' : `修改快捷键：${keys.join(' + ')}`}
-        title={isRecording ? '按 Esc 取消录制' : '点击修改快捷键'}
-      >
-        {isRecording ? (
-          <span role="status" className="windows-hotkey-prompt">请按下快捷键<span>Esc 取消</span></span>
-        ) : isUnset ? (
-          <span className="text-hint text-muted">未设置</span>
-        ) : keys.map((key, index) => (
-          <span key={key} className="inline-flex items-center gap-1">
-            {index > 0 && <span aria-hidden="true" className="windows-hotkey-separator">+</span>}
-            <kbd className={`windows-hotkey-key ${index === keys.length - 1 ? 'text-base font-semibold text-accent' : 'text-ink'}`}>
-              {key}
-            </kbd>
-          </span>
-        ))}
-      </button>
-    );
-  }
-
-  if (isUnset || isRecording) {
-    return (
-      <button onClick={handleClick} className={containerClass}>
-        {isRecording ? (
-          <>
-            {/* 录制中显示所有修饰键（灰色） */}
-            <span className="text-base text-faint">{shiftLabel}</span>
-            <span className="text-base text-faint">{optionLabel}</span>
-            <span className="text-base text-faint">{primaryLabel}</span>
-            {!isWindows && <span className="text-base text-faint">⌃</span>}
-            <span className="ml-1 text-hint text-faint animate-pulse">按下快捷键...</span>
-          </>
-        ) : (
-          <>
-            {/* 未设置显示所有修饰键（灰色） */}
-            <span className="text-base text-faint">{shiftLabel}</span>
-            <span className="text-base text-faint">{optionLabel}</span>
-            <span className="text-base text-faint">{primaryLabel}</span>
-            {!isWindows && <span className="text-base text-faint">⌃</span>}
-            <span className="ml-1 text-hint text-faint">未设置</span>
-          </>
-        )}
-      </button>
-    );
-  }
-
   return (
-    <button onClick={handleClick} className={containerClass}>
-      {/* Shift */}
-      <span className={`text-base ${hasShift ? 'text-ink' : 'text-faint'}`}>{shiftLabel}</span>
-
-      {/* Option */}
-      <span className={`text-base ${hasOption ? 'text-ink' : 'text-faint'}`}>{optionLabel}</span>
-
-      {/* Primary modifier */}
-      <span className={`text-base ${primaryModifierClass}`}>
-        {primaryLabel}
-      </span>
-
-      {/* Control */}
-      {!isWindows && (
-        <span className={`text-base ${hasControl ? 'text-ink' : 'text-faint'}`}>⌃</span>
-      )}
-
-      {/* 字母键 */}
-      {letterKey && (
+    <button
+      type="button"
+      onClick={handleClick}
+      className={containerClass}
+      aria-label={isRecording ? '请按下快捷键，Esc 取消' : isUnset ? '设置快捷键' : `修改快捷键：${activeKeys.join(' + ')}`}
+      title={isRecording ? '按 Esc 取消录制' : '点击修改快捷键'}
+    >
+      {modifiers.map(({ label, active }) => (
+        <kbd key={label} aria-hidden="true" className={`font-[inherit] text-base ${!isUnset && !isRecording && active ? 'text-ink' : 'text-faint'}`}>
+          {label}
+        </kbd>
+      ))}
+      {isRecording || isUnset ? (
+        <span className={`ml-1 whitespace-nowrap text-hint text-faint${isRecording ? ' animate-pulse' : ''}`}>
+          {isRecording ? '按下快捷键...' : '未设置'}
+        </span>
+      ) : letterKey && (
         <span
           className="ml-1 text-base font-semibold text-accent"
           style={{

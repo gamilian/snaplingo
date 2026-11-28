@@ -1,5 +1,8 @@
+mod accessibility;
 mod clipboard;
 mod shortcut_copy;
+#[cfg(target_os = "windows")]
+mod ui_automation;
 
 use crate::domain::{SelectionContext, SelectionMethodKind};
 
@@ -17,11 +20,17 @@ impl SelectionContextProvider for PlatformSelectionProvider {
 
 impl SystemSelectionProvider for PlatformSelectionProvider {
     fn default_scheme(&self) -> Vec<SelectionMethodKind> {
-        vec![SelectionMethodKind::ShortcutCopy]
+        vec![
+            SelectionMethodKind::Accessibility,
+            SelectionMethodKind::ShortcutCopy,
+        ]
     }
 
     fn methods(&self) -> Vec<Box<dyn SelectionMethod>> {
-        vec![Box::new(shortcut_copy::ShortcutCopySelectionMethod)]
+        vec![
+            Box::new(accessibility::AccessibilitySelectionMethod),
+            Box::new(shortcut_copy::ShortcutCopySelectionMethod),
+        ]
     }
 }
 
@@ -44,18 +53,27 @@ mod selection_provider_tests {
                     .map(|method| method.kind())
                     .collect::<Vec<_>>();
 
-                assert_eq!(method_kinds, vec![SelectionMethodKind::ShortcutCopy]);
+                assert_eq!(
+                    method_kinds,
+                    vec![
+                        SelectionMethodKind::Accessibility,
+                        SelectionMethodKind::ShortcutCopy
+                    ]
+                );
             }
         }
     }
 
     #[test]
-    fn default_scheme_prefers_shortcut_copy() {
+    fn default_scheme_prefers_direct_selection_before_shortcut_copy() {
         let provider = PlatformSelectionProvider;
 
         assert_eq!(
             provider.default_scheme(),
-            vec![SelectionMethodKind::ShortcutCopy]
+            vec![
+                SelectionMethodKind::Accessibility,
+                SelectionMethodKind::ShortcutCopy
+            ]
         );
     }
 }
