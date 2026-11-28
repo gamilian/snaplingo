@@ -4,39 +4,19 @@ export async function prepareCaptureSurfaceForReveal({
   windowPrepared,
   frame,
   paintSelectionOverlayFrame,
-  waitForPaint = waitForCaptureSurfacePaint,
+  flushStyles,
 }: {
   windowPrepared?: Promise<void>;
   frame: CaptureSelectionOverlayFrame | null;
   paintSelectionOverlayFrame: (
     frame: CaptureSelectionOverlayFrame | null,
   ) => void;
-  waitForPaint?: typeof waitForCaptureSurfacePaint;
+  flushStyles: () => void;
 }) {
-  // Selection input only needs geometry and the overlay, not decoded pixels.
+  // Visual layers stay transparent until native reveal. Waiting for a paint
+  // while the WebView is hidden only stalls input until its timer fallback.
   await windowPrepared;
   paintSelectionOverlayFrame(frame);
-  await waitForPaint();
-}
-
-export async function waitForCaptureSurfacePaint(
-  requestAnimationFrame: typeof globalThis.requestAnimationFrame =
-    globalThis.requestAnimationFrame,
-  timeoutMs = 48,
-) {
-  const paint = new Promise<void>((resolve) => {
-    requestAnimationFrame(() => resolve());
-  });
-
-  if (timeoutMs <= 0) {
-    await paint;
-    return;
-  }
-
-  await Promise.race([
-    paint,
-    new Promise<void>((resolve) => {
-      globalThis.setTimeout(resolve, timeoutMs);
-    }),
-  ]);
+  // Commit opacity=0 before reveal so the entrance transition has a start state.
+  flushStyles();
 }

@@ -144,6 +144,10 @@ pub fn prepare_capture_window_for_reveal(
     if let Some(geometry) = geometry {
         set_capture_window_frame(&window, geometry)?;
     }
+    configure_capture_window_for_current_space(
+        &window,
+        geometry.and_then(|value| value.desktop_scale),
+    )?;
 
     #[cfg(target_os = "macos")]
     {
@@ -351,11 +355,7 @@ pub(super) fn open_capture_window_for_session(
                     .set_visible_on_all_workspaces(true)
                     .map_err(|e| e.to_string())?;
             }
-            window
-                .set_focusable(capture_window_is_focusable())
-                .map_err(|e| e.to_string())?;
-            set_capture_window_frame(&window, geometry)?;
-            configure_capture_window_for_current_space(&window, geometry.desktop_scale)?;
+            prepare_capture_window_for_reveal(app, Some(geometry))?;
             bind_capture_window_session(app, session_id);
             window
                 .emit(
@@ -384,7 +384,7 @@ pub(super) fn open_capture_window_for_session(
     // native frame so that a late queued move cannot restore the main origin.
     #[cfg(not(target_os = "windows"))]
     let initial_bounds = geometry.bounds.clone();
-    let window = WebviewWindowBuilder::new(
+    WebviewWindowBuilder::new(
         app,
         CAPTURE_WINDOW_LABEL,
         WebviewUrl::App(capture_window_url_with_session(mode, session_id)),
@@ -406,9 +406,7 @@ pub(super) fn open_capture_window_for_session(
     .build()
     .map_err(|e| e.to_string())?;
     bind_capture_window_session(app, session_id);
-    set_capture_window_frame(&window, geometry)?;
-    configure_capture_window_for_current_space(&window, geometry.desktop_scale)?;
-    restore_capture_window_activation();
+    prepare_capture_window_for_reveal(app, Some(geometry))?;
 
     Ok(CaptureWindowUpdate::Ready)
 }

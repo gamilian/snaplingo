@@ -28,6 +28,9 @@ pub struct CaptureSessionRuntime {
     pub(super) host: Arc<dyn CaptureSessionRuntimeHost>,
     pub(super) pin_output: Arc<dyn CapturePinOutput>,
     pub(super) startup: tokio::sync::Mutex<()>,
+    // Serialize native open/prepare/hide, including a WebView request arriving
+    // before the open call has returned from the main thread.
+    prepared_window_session: tokio::sync::Mutex<Option<CaptureSessionId>>,
     pub(super) scrolling: tokio::sync::Mutex<Option<super::scrolling::ScrollingCaptureTask>>,
     pub(super) scrolling_host: Arc<dyn super::scrolling::ScrollingCaptureHost>,
     pub(super) presentations: tokio::sync::Mutex<HashMap<CaptureSessionId, u64>>,
@@ -70,6 +73,7 @@ impl CaptureSessionRuntime {
             pin_output,
             settings: None,
             startup: tokio::sync::Mutex::new(()),
+            prepared_window_session: tokio::sync::Mutex::new(None),
             scrolling: tokio::sync::Mutex::new(None),
             scrolling_host: Arc::new(super::scrolling::UnconfiguredScrollingCaptureHost),
             presentations: tokio::sync::Mutex::new(HashMap::new()),
@@ -144,7 +148,7 @@ impl CaptureSessionRuntime {
         let begin_ms = elapsed_ms(begin_start);
 
         let hide_overlay_start = Instant::now();
-        if let Err(err) = self.host.hide_capture_window().await {
+        if let Err(err) = self.hide_capture_window().await {
             let presentation_result = self.host.end_capture_presentation().await;
             return match presentation_result {
                 Ok(()) => Err(err),
@@ -230,13 +234,18 @@ impl CaptureSessionRuntime {
         let view_base64_bytes = capture_session_view_base64_bytes(&session);
 
         let open_start = Instant::now();
-        let open_result = match self.sessions.window_geometry(&session.id) {
-            Ok(geometry) => {
-                self.host
-                    .open_capture_window_for_session(mode, &session.id.0, &geometry)
-                    .await
-            }
-            Err(error) => Err(error),
+        let open_result = {
+            let mut prepared = self.prepared_window_session.lock().await;
+            let result = match self.sessions.window_geometry(&session.id) {
+                Ok(geometry) => {
+                    self.host
+                        .open_capture_window_for_session(mode, &session.id.0, &geometry)
+                        .await
+                }
+                Err(error) => Err(error),
+            };
+            *prepared = result.is_ok().then(|| session.id.clone());
+            result
         };
         let open_ms = elapsed_ms(open_start);
 
@@ -285,12 +294,20 @@ impl CaptureSessionRuntime {
         &self,
         session_id: Option<&CaptureSessionId>,
     ) -> Result<()> {
+        let mut prepared = self.prepared_window_session.lock().await;
+        // Validate the session even when its native window was already prepared.
         let geometry = session_id
             .map(|id| self.sessions.window_geometry(id))
             .transpose()?;
+        if session_id.is_some() && prepared.as_ref() == session_id {
+            return Ok(());
+        }
+        *prepared = None;
         self.host
             .prepare_capture_window_for_reveal(session_id, geometry.as_ref())
-            .await
+            .await?;
+        *prepared = session_id.cloned();
+        Ok(())
     }
 
     pub async fn reveal_capture_window(&self, session_id: Option<&CaptureSessionId>) -> Result<()> {
@@ -301,6 +318,8 @@ impl CaptureSessionRuntime {
     }
 
     pub async fn hide_capture_window(&self) -> Result<()> {
+        let mut prepared = self.prepared_window_session.lock().await;
+        *prepared = None;
         self.host.hide_capture_window().await
     }
 
@@ -505,7 +524,7 @@ impl CaptureSessionRuntime {
             return Err("Capture OCR session is no longer current".into());
         }
         let result_id = self.host.reserve_capture_ocr_result(job.target)?;
-        let hide_result = self.host.hide_capture_window().await;
+        let hide_result = self.hide_capture_window().await;
         let cancel_result = self.cancel_capture_session_inner(session_id).await;
         if let Err(error) = hide_result.and(cancel_result) {
             self.host
@@ -1843,6 +1862,87 @@ mod tests {
                 .load(std::sync::atomic::Ordering::SeqCst),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn a_launched_capture_does_not_repeat_native_window_preparation() {
+        let barrier = Arc::new(StartupBarrier::default());
+        let host = Arc::new(RecordingRuntimeHost {
+            open_barrier: Some(barrier.clone()),
+            ..RecordingRuntimeHost::succeeds()
+        });
+        let (runtime, _, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+        let runtime = Arc::new(runtime);
+        let opening = {
+            let runtime = runtime.clone();
+            tokio::spawn(async move { runtime.open_capture_window_for_mode("screenshot").await })
+        };
+        barrier.entered.notified().await;
+        let session_id = host
+            .calls()
+            .into_iter()
+            .find_map(|call| match call {
+                HostCall::OpenCaptureWindow { session_id, .. } => {
+                    Some(CaptureSessionId(session_id))
+                }
+                _ => None,
+            })
+            .unwrap();
+        host.calls.lock().unwrap().clear();
+        // The session event can reach the WebView before native open returns.
+        let prepare = runtime.prepare_capture_window_for_reveal(Some(&session_id));
+        tokio::pin!(prepare);
+        tokio::select! {
+            biased;
+            result = &mut prepare => panic!("preparation raced native open: {result:?}"),
+            _ = tokio::task::yield_now() => {}
+        }
+        assert!(host.calls().is_empty());
+        barrier.release.notify_one();
+        opening.await.unwrap().unwrap();
+        prepare.await.unwrap();
+        runtime
+            .prepare_capture_window_for_reveal(Some(&session_id))
+            .await
+            .unwrap();
+        assert!(
+            host.calls().is_empty(),
+            "opening already prepared this session's window"
+        );
+
+        runtime.hide_capture_window().await.unwrap();
+        runtime
+            .prepare_capture_window_for_reveal(Some(&session_id))
+            .await
+            .unwrap();
+        assert!(matches!(
+            host.calls().as_slice(),
+            [
+                HostCall::HideCaptureWindow,
+                HostCall::PrepareCaptureWindowForReveal(_)
+            ]
+        ));
+    }
+
+    #[tokio::test]
+    async fn direct_sessions_prepare_once_and_cancelled_sessions_cannot_reuse_preparation() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, sessions, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+        let session = sessions.create_session().await.unwrap();
+        runtime
+            .prepare_capture_window_for_reveal(Some(&session.id))
+            .await
+            .unwrap();
+        runtime
+            .prepare_capture_window_for_reveal(Some(&session.id))
+            .await
+            .unwrap();
+        assert_eq!(host.calls().len(), 1);
+        sessions.cancel_session(&session.id).unwrap();
+        assert!(runtime
+            .prepare_capture_window_for_reveal(Some(&session.id))
+            .await
+            .is_err());
     }
 
     #[tokio::test]

@@ -197,8 +197,6 @@ pub(super) fn reveal_capture_window_for_current_space(
 }
 
 pub(super) fn prepare_capture_window_for_reveal(window: &WebviewWindow) -> Result<(), String> {
-    configure_capture_window_for_current_space(window)?;
-
     let ns_window = window.ns_window().map_err(|e| e.to_string())?;
     if ns_window.is_null() {
         return Err("Capture window has no native NSWindow".to_string());

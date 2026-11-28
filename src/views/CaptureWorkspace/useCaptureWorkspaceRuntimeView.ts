@@ -267,6 +267,7 @@ export function useCaptureWorkspaceRuntimeView({
         windowPrepared,
         frame: overlay.getCurrentFrame(),
         paintSelectionOverlayFrame: overlay.paintFrame,
+        flushStyles: () => { desktopRef.current?.getBoundingClientRect(); },
       }),
     [overlay.getCurrentFrame, overlay.paintFrame],
   );

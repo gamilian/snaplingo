@@ -120,28 +120,21 @@ fn macos_app_bundle_path(executable_path: &std::path::Path) -> Option<std::path:
 fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
     image_to_png_with_options(
         cg_image,
-        capture_png_compression_type(),
-        capture_png_filter_type(),
+        Some((capture_png_compression_type(), capture_png_filter_type())),
     )
 }
 
 /// Encode a monitor snapshot for the selection surface.
 ///
-/// The browser decodes this image immediately before the capture window is
-/// revealed. Stored PNG blocks keep that critical path CPU-light while the
-/// final selection is re-encoded by the output pipeline.
+/// Choose a fast lossless encoding from a small row sample. Compressible desktop
+/// content should not send a full raw-screen-sized PNG through the WebView.
 fn image_to_preview_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
-    image_to_png_with_options(
-        cg_image,
-        preview_png_compression_type(),
-        preview_png_filter_type(),
-    )
+    image_to_png_with_options(cg_image, None)
 }
 
 fn image_to_png_with_options(
     cg_image: CGImage,
-    compression: PngCompressionType,
-    filter: PngFilterType,
+    options: Option<(PngCompressionType, PngFilterType)>,
 ) -> Result<Vec<u8>, AppError> {
     let total_start = Instant::now();
     let width = cg_image.width();
@@ -153,20 +146,12 @@ fn image_to_png_with_options(
     let rgba_data = bgra_image_data_to_rgba(data.bytes(), width, height, bytes_per_row)?;
     let convert_ms = elapsed_ms(convert_start);
 
-    // Encode as PNG
     let encode_start = Instant::now();
-    let mut png_data = Vec::new();
-    let mut cursor = Cursor::new(&mut png_data);
-    let encoder = PngEncoder::new_with_quality(&mut cursor, compression, filter);
-
-    encoder
-        .write_image(
-            &rgba_data,
-            width as u32,
-            height as u32,
-            ExtendedColorType::Rgba8,
-        )
-        .map_err(|e| AppError::System(format!("Failed to encode PNG: {}", e)))?;
+    let (compression, filter) = match options {
+        Some(options) => options,
+        None => preview_png_options(&rgba_data, width, height)?,
+    };
+    let png_data = encode_rgba_png(&rgba_data, width, height, compression, filter)?;
     let encode_ms = elapsed_ms(encode_start);
 
     log::info!(
@@ -216,14 +201,11 @@ fn bgra_image_data_to_rgba(
 
     let mut rgba_data = vec![0; output_len];
     for y in 0..height {
-        let src_start = y * bytes_per_row;
-        let dst_start = y * row_bytes;
-        rgba_data[dst_start..dst_start + row_bytes]
-            .copy_from_slice(&data[src_start..src_start + row_bytes]);
-    }
-
-    for pixel in rgba_data.chunks_exact_mut(4) {
-        pixel.swap(0, 2);
+        let source = &data[y * bytes_per_row..][..row_bytes];
+        let destination = &mut rgba_data[y * row_bytes..][..row_bytes];
+        for (source, target) in source.chunks_exact(4).zip(destination.chunks_exact_mut(4)) {
+            target.copy_from_slice(&[source[2], source[1], source[0], source[3]]);
+        }
     }
 
     Ok(rgba_data)
@@ -239,12 +221,52 @@ fn capture_png_filter_type() -> PngFilterType {
     PngFilterType::Sub
 }
 
-fn preview_png_compression_type() -> PngCompressionType {
-    PngCompressionType::Uncompressed
+fn encode_rgba_png(
+    rgba: &[u8],
+    width: usize,
+    height: usize,
+    compression: PngCompressionType,
+    filter: PngFilterType,
+) -> Result<Vec<u8>, AppError> {
+    // Stored PNGs are approximately raw pixels plus scanline/block headers.
+    // Reserving once avoids reallocating and copying a full 4K buffer.
+    let capacity = if compression == PngCompressionType::Uncompressed {
+        rgba.len() + rgba.len() / 32 + height + 1024
+    } else {
+        0
+    };
+    let mut png = Vec::with_capacity(capacity);
+    PngEncoder::new_with_quality(&mut png, compression, filter)
+        .write_image(rgba, width as u32, height as u32, ExtendedColorType::Rgba8)
+        .map_err(|error| AppError::System(format!("Failed to encode PNG: {error}")))?;
+    Ok(png)
 }
 
-fn preview_png_filter_type() -> PngFilterType {
-    PngFilterType::NoFilter
+fn preview_png_options(
+    rgba: &[u8],
+    width: usize,
+    height: usize,
+) -> Result<(PngCompressionType, PngFilterType), AppError> {
+    // Keep full-width rows so the sample preserves horizontal pixel correlation.
+    let rows = height.min(16);
+    let stride = width * 4;
+    let mut sample = Vec::with_capacity(stride * rows);
+    for row in 0..rows {
+        let start = row * height / rows * stride;
+        sample.extend_from_slice(&rgba[start..start + stride]);
+    }
+    let probe = encode_rgba_png(
+        &sample,
+        width,
+        rows,
+        PngCompressionType::Fast,
+        PngFilterType::Sub,
+    )?;
+    Ok(if probe.len() < sample.len() / 2 {
+        (PngCompressionType::Fast, PngFilterType::Sub)
+    } else {
+        (PngCompressionType::Uncompressed, PngFilterType::NoFilter)
+    })
 }
 
 fn captured_cursor_from_appkit_geometry(
@@ -948,6 +970,82 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "deterministic 4K image encoding benchmark"]
+    fn benchmark_capture_pixel_pipeline() {
+        use core_graphics::{
+            base::{kCGBitmapByteOrder32Little, kCGImageAlphaPremultipliedFirst},
+            color_space::CGColorSpace,
+            data_provider::CGDataProvider,
+        };
+        let (width, height) = (3840usize, 2160usize);
+        for noisy in [false, true] {
+            let mut seed = 7u32;
+            let mut bgra = vec![255u8; width * height * 4];
+            for y in 0..height {
+                for x in 0..width {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 17;
+                    seed ^= seed << 5;
+                    let pixel = &mut bgra[(y * width + x) * 4..][..4];
+                    pixel[0] = if noisy { seed as u8 } else { (x / 16) as u8 };
+                    pixel[1] = if noisy {
+                        (seed >> 8) as u8
+                    } else {
+                        (y / 9) as u8
+                    };
+                    pixel[2] = if noisy {
+                        (seed >> 16) as u8
+                    } else {
+                        ((x / 16 + y / 9) / 2) as u8
+                    };
+                }
+            }
+            let provider = CGDataProvider::from_buffer(std::sync::Arc::new(bgra));
+            let screenshot = CGImage::new(
+                width,
+                height,
+                8,
+                32,
+                width * 4,
+                &CGColorSpace::create_device_rgb(),
+                kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst,
+                &provider,
+                false,
+                0,
+            );
+            for (name, options) in [
+                (
+                    "stored",
+                    Some((PngCompressionType::Uncompressed, PngFilterType::NoFilter)),
+                ),
+                (
+                    "fast-sub",
+                    Some((PngCompressionType::Fast, PngFilterType::Sub)),
+                ),
+                ("adaptive", None),
+            ] {
+                let mut encode = Vec::new();
+                let mut decode = Vec::new();
+                let mut bytes = 0;
+                for _ in 0..7 {
+                    let start = Instant::now();
+                    let png = image_to_png_with_options(screenshot.clone(), options).unwrap();
+                    encode.push(elapsed_ms(start));
+                    bytes = png.len();
+                    let start = Instant::now();
+                    let decoded = image::load_from_memory(&png).unwrap().to_rgba8();
+                    decode.push(elapsed_ms(start));
+                    assert_eq!(decoded.dimensions(), (width as u32, height as u32));
+                    std::hint::black_box(decoded);
+                }
+                encode.sort_by(f64::total_cmp);
+                decode.sort_by(f64::total_cmp);
+                eprintln!("pixel pipeline noisy={noisy} encoder={name} encode_ms={:.2} decode_ms={:.2} bytes={bytes}", encode[3], decode[3]);
+            }
+        }
+    }
+
+    #[test]
     fn converts_bgra_display_rows_to_contiguous_rgba() {
         let rgba = bgra_image_data_to_rgba(
             &[
@@ -974,14 +1072,6 @@ mod tests {
         assert_eq!(
             capture_png_filter_type(),
             image::codecs::png::FilterType::Sub
-        );
-        assert_eq!(
-            preview_png_compression_type(),
-            image::codecs::png::CompressionType::Uncompressed
-        );
-        assert_eq!(
-            preview_png_filter_type(),
-            image::codecs::png::FilterType::NoFilter
         );
     }
 
@@ -1019,6 +1109,11 @@ mod tests {
             image::load_from_memory(&preview_png).unwrap().to_rgba8(),
             rgba
         );
+        assert!(
+            preview_png.len() < rgba.as_raw().len() / 2,
+            "smooth desktop preview still transfers {} bytes",
+            preview_png.len()
+        );
 
         let png = image_to_png(screenshot).unwrap();
         assert_eq!(image::load_from_memory(&png).unwrap().to_rgba8(), rgba);
@@ -1026,6 +1121,29 @@ mod tests {
             png.len() < rgba.as_raw().len() / 2,
             "desktop gradient PNG expanded to {} bytes",
             png.len(),
+        );
+    }
+
+    #[test]
+    fn preview_encoding_keeps_noisy_and_transparent_pixels_exact() {
+        let (width, height) = (512usize, 128usize);
+        let mut seed = 11u32;
+        let mut rgba = vec![0; width * height * 4];
+        for pixel in rgba.chunks_exact_mut(4) {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            pixel.copy_from_slice(&seed.to_le_bytes());
+        }
+        let options = preview_png_options(&rgba, width, height).unwrap();
+        assert_eq!(
+            options,
+            (PngCompressionType::Uncompressed, PngFilterType::NoFilter)
+        );
+        let png = encode_rgba_png(&rgba, width, height, options.0, options.1).unwrap();
+        assert_eq!(
+            image::load_from_memory(&png).unwrap().to_rgba8().as_raw(),
+            &rgba
         );
     }
 

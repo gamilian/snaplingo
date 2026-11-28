@@ -101,6 +101,7 @@ pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
         Ok(())
     }
     async fn destroy_inactive_capture_window(&self) -> Result<()>;
+    /// Prepare hidden geometry and styles before notifying the WebView of its session.
     async fn open_capture_window_for_session(
         &self,
         mode: &str,

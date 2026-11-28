@@ -214,7 +214,7 @@ impl CaptureSessionRuntime {
             ui_scale,
         };
         let view = task.view()?;
-        self.host.hide_capture_window().await?;
+        self.hide_capture_window().await?;
         match self.scrolling_host.open(&view, &task.geometry).await {
             Ok(options) => {
                 task.shortcuts = options.shortcuts;
