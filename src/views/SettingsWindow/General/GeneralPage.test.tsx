@@ -55,6 +55,7 @@ describe('GeneralPage durable settings', () => {
       '界面与启动',
       '系统权限',
       '网络',
+      '资料库容量',
       '日志与维护',
       '实验性功能',
       '关于',

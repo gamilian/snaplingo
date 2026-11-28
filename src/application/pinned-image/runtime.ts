@@ -5,6 +5,8 @@ import {
   type ColorSampleFormat,
 } from '../image-inspection/colorSampler';
 import {
+  PINNED_DOCK_HEIGHT,
+  PINNED_WINDOW_MIN_WIDTH,
   createDefaultPinnedTransform,
   getPinnedDisplaySizeForTransform,
   getPinnedDisplaySize,
@@ -78,7 +80,7 @@ export function createPinnedImageRuntime({
       presentation.transform,
       presentation.thumbnailMode,
     );
-    return window.resize(size.width, size.height);
+    return window.resize(Math.max(PINNED_WINDOW_MIN_WIDTH, size.width), size.height + PINNED_DOCK_HEIGHT, PINNED_DOCK_HEIGHT);
   }
 
   function exportSize() {

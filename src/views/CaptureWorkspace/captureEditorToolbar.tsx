@@ -314,6 +314,9 @@ export function CaptureEditorToolbar({
     void persistColorPresets(nextColors, null);
   };
 
+  const quickPropertiesAbove = position.y + 92 * uiScale > window.innerHeight;
+  const toolLabel = activeAnnotationTool ? ({ rectangle: '矩形', ellipse: '椭圆', arrow: '箭头', line: '直线', pen: '画笔', highlight: '荧光笔', 'region-highlight': '区域高亮', blur: '模糊', spotlight: '聚光灯', mosaic: '马赛克', text: '文字', eraser: '橡皮擦' })[activeAnnotationTool] : '标注';
+
   return (
     <div
       ref={toolbarRef}
@@ -421,110 +424,6 @@ export function CaptureEditorToolbar({
         <RedoIcon />
       </IconActionButton>
       <div className={getCaptureEditorDividerClassName()} />
-      <div className="relative flex h-7 shrink-0">
-        <IconActionButton
-          className="h-7 w-7 shrink-0 rounded-sm shadow-[inset_0_0_0_1px_rgba(0,0,0,0.18)] disabled:cursor-not-allowed disabled:opacity-40"
-          style={{
-            backgroundColor: annotationColorToCss(annotationStyle.color),
-          }}
-          disabled={isRenderingOutput}
-          title="Annotation color"
-          tooltipPlacement="bottom"
-          aria-label="Annotation color"
-          aria-haspopup="dialog"
-          aria-expanded={openPicker === "color"}
-          onClick={openColorPicker}
-        >
-          <span className="sr-only">Annotation color</span>
-        </IconActionButton>
-        {openPicker === "color" && (
-          <ColorPickerPopover
-            colors={visibleColorPresets}
-            draftColor={colorDraft}
-            selectedIndex={selectedColorPresetIndex}
-            error={colorPresetError}
-            opensUpward={position.y + 292 > window.innerHeight}
-            onClose={() => setOpenPicker(null)}
-            onSelect={(color, index) => {
-              setSelectedColorPresetIndex(index);
-              applyColor(color);
-            }}
-            onDraftChange={updateColorDraft}
-            onAdd={addColorPreset}
-            onReplace={replaceColorPreset}
-            onDelete={deleteColorPreset}
-          />
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5 pl-1 pr-0.5">
-        <input
-          className="h-7 w-[86px] accent-accent disabled:opacity-40"
-          type="range"
-          min={
-            isTextSizingActive ? Math.min(MIN_TEXT_FONT_SIZE, textFontSize) : MIN_ANNOTATION_STROKE_WIDTH
-          }
-          max={
-            isTextSizingActive ? Math.max(MAX_TEXT_FONT_SIZE, textFontSize) : MAX_ANNOTATION_STROKE_WIDTH
-          }
-          step={1}
-          value={sizeValue}
-          disabled={isRenderingOutput}
-          title={
-            sizeLabel
-          }
-          aria-label={
-            sizeLabel
-          }
-          onInput={(event) => {
-            const value = Number(event.currentTarget.value);
-            pendingSizeDefaultRef.current = {
-              kind: isTextSizingActive ? "font" : "stroke",
-              value,
-            };
-            if (textDraftActive) {
-              onTextDraftFontSizeChange(value);
-              return;
-            }
-
-            if (isTextSizingActive) {
-              onApplyAnnotationStyle(annotationStyle, value);
-              return;
-            }
-
-            onApplyAnnotationStyle(
-              {
-                ...annotationStyle,
-                strokeWidth: value,
-              },
-              textFontSize,
-            );
-          }}
-          onPointerUp={commitSizeDefault}
-          onKeyUp={commitSizeDefault}
-          onBlur={commitSizeDefault}
-        />
-        <span className="w-7 text-right font-mono text-hint tabular-nums text-muted" title={sizeLabel}>
-          {sizeValue}
-        </span>
-      </div>
-      <input
-        className="h-4 w-4 accent-accent disabled:opacity-40"
-        type="checkbox"
-        checked={annotationStyle.filled}
-        disabled={isRenderingOutput || !isFillModeActive}
-        title="Fill shape"
-        aria-label="Fill shape"
-        onChange={(event) => {
-          onApplyAnnotationStyle(
-            {
-              ...annotationStyle,
-              filled: event.currentTarget.checked,
-            },
-            textFontSize,
-          );
-        }}
-      />
-      <div className={getCaptureEditorDividerClassName()} />
       <button
         type="button"
         className={getCaptureEditorCommandButtonClassName()}
@@ -552,7 +451,7 @@ export function CaptureEditorToolbar({
       {openPicker === "properties" && (isTextSizingActive || hasCornerControl || hasBlurControl) && (
         <div
           className="absolute left-0 flex w-full flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-xs text-ink shadow-lg"
-          style={position.y + 120 * uiScale > window.innerHeight ? { bottom: 'calc(100% + 8px)' } : { top: 'calc(100% + 8px)' }}
+          style={quickPropertiesAbove ? { bottom: 'calc(100% + 56px)' } : { top: 'calc(100% + 56px)' }}
           role="group"
           aria-label="Annotation properties"
         >
@@ -640,6 +539,106 @@ export function CaptureEditorToolbar({
       >
         <CopyIcon />
       </button>
+      <div className="capture-quick-properties" role="group" aria-label="标注快捷属性" style={quickPropertiesAbove ? { bottom: 'calc(100% + 8px)' } : { top: 'calc(100% + 8px)' }}>
+        <span className="font-semibold text-accent">{toolLabel}</span>
+        <div className="capture-quick-colors">
+          {visibleColorPresets.slice(0, 5).map((color, index) => <button key={index} type="button" className="capture-quick-color" style={{ backgroundColor: annotationColorToCss(color) }} aria-label={`选择颜色 ${annotationColorToHex(color)}`} aria-pressed={annotationColorsEqual(color, annotationStyle.color)} disabled={isRenderingOutput} onClick={() => applyColor(color)} />)}
+        </div>
+      <div className="relative flex h-7 shrink-0">
+        <IconActionButton
+          className="h-7 shrink-0 rounded-md disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={isRenderingOutput}
+          title="Annotation color"
+          tooltipPlacement="bottom"
+          aria-label="Annotation color"
+          aria-haspopup="dialog"
+          aria-expanded={openPicker === "color"}
+          onClick={openColorPicker}
+        >
+          <span className="capture-quick-palette"><span />调色板</span>
+        </IconActionButton>
+        {openPicker === "color" && (
+          <ColorPickerPopover
+            colors={visibleColorPresets}
+            draftColor={colorDraft}
+            selectedIndex={selectedColorPresetIndex}
+            error={colorPresetError}
+            opensUpward={quickPropertiesAbove || position.y + 380 * uiScale > window.innerHeight}
+            onClose={() => setOpenPicker(null)}
+            onSelect={(color, index) => {
+              setSelectedColorPresetIndex(index);
+              applyColor(color);
+            }}
+            onDraftChange={updateColorDraft}
+            onAdd={addColorPreset}
+            onReplace={replaceColorPreset}
+            onDelete={deleteColorPreset}
+          />
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5 pl-1 pr-0.5">
+        <span>{isTextSizingActive ? '字号' : '粗细'}</span>
+        <input
+          className="h-7 w-[86px] accent-accent disabled:opacity-40"
+          type="range"
+          min={
+            isTextSizingActive ? Math.min(MIN_TEXT_FONT_SIZE, textFontSize) : MIN_ANNOTATION_STROKE_WIDTH
+          }
+          max={
+            isTextSizingActive ? Math.max(MAX_TEXT_FONT_SIZE, textFontSize) : MAX_ANNOTATION_STROKE_WIDTH
+          }
+          step={1}
+          value={sizeValue}
+          disabled={isRenderingOutput}
+          title={
+            sizeLabel
+          }
+          aria-label={
+            sizeLabel
+          }
+          onInput={(event) => {
+            const value = Number(event.currentTarget.value);
+            pendingSizeDefaultRef.current = {
+              kind: isTextSizingActive ? "font" : "stroke",
+              value,
+            };
+            if (textDraftActive) {
+              onTextDraftFontSizeChange(value);
+              return;
+            }
+
+            if (isTextSizingActive) {
+              onApplyAnnotationStyle(annotationStyle, value);
+              return;
+            }
+
+            onApplyAnnotationStyle(
+              {
+                ...annotationStyle,
+                strokeWidth: value,
+              },
+              textFontSize,
+            );
+          }}
+          onPointerUp={commitSizeDefault}
+          onKeyUp={commitSizeDefault}
+          onBlur={commitSizeDefault}
+        />
+        <span className="w-7 text-right font-mono text-hint tabular-nums text-muted" title={sizeLabel}>
+          {sizeValue}{isTextSizingActive ? '' : 'px'}
+        </span>
+      </div>
+      <button
+        type="button"
+        className="settings-action"
+        disabled={isRenderingOutput || !isFillModeActive}
+        title="Fill shape"
+        aria-label="Fill shape"
+        aria-pressed={annotationStyle.filled}
+        onClick={() => onApplyAnnotationStyle({ ...annotationStyle, filled: !annotationStyle.filled }, textFontSize)}
+      >{annotationStyle.filled ? '填充模式' : '边框模式'}</button>
+
+      </div>
     </div>
   );
 }

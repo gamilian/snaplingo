@@ -46,6 +46,7 @@ describe('settings main navigation', () => {
 
     expect(container.textContent).toContain('设置');
     expect(container.textContent).toContain('资料库');
+    expect([...container.querySelectorAll('[aria-label="主导航"] button')].map((button) => button.textContent)).toEqual(['概览与快捷键', '截图与贴图', '翻译与识别', '引擎与语音', '通用设置', '资料库']);
     expect(container.textContent).not.toContain('工作区');
     expect(container.textContent).not.toContain('高级');
     expect(container.textContent).toContain('收藏已用');

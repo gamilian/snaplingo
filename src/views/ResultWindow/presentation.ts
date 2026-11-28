@@ -127,7 +127,7 @@ export function resultWindowOcrPanelHeight(
 export function resultWindowHeaderDragHandleClassName(isDraggable: boolean) {
   const dragClassName = isDraggable ? 'cursor-move' : 'cursor-default';
 
-  return `flex min-w-0 flex-1 select-none items-center gap-3 ${dragClassName}`;
+  return `flex min-w-0 flex-1 select-none items-center justify-center gap-3 ${dragClassName}`;
 }
 
 export function resultWindowPinButtonClassName(isPinned: boolean) {
@@ -389,7 +389,7 @@ export function resultWindowTranslationSubtitle(
 }
 
 export function resultWindowOcrResultStackClassName() {
-  return 'flex shrink-0 flex-col gap-3';
+  return 'ocr-result-grid grid shrink-0 grid-cols-[minmax(160px,0.7fr)_minmax(0,1.3fr)] items-start gap-3';
 }
 
 export function resultWindowOcrImagePanelClassName() {

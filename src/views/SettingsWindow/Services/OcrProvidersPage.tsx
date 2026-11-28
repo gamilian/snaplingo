@@ -55,7 +55,7 @@ export function OcrProvidersPage() {
 
   return (
     <div className="max-w-5xl space-y-3">
-      <div className="-mx-[22px] divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
+      <div className="divide-y divide-line overflow-hidden bg-surface">
         {providers.map((provider) => (
           <ProviderCard
             key={provider.id}

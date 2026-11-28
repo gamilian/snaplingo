@@ -206,18 +206,6 @@
     .bento-val { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
     .bento-sub { font-size: 11px; color: var(--faint); }
 
-    /* Sub-tabs in header to keep long pages airy and scannable */
-    .pane-tabs {
-      display: inline-flex; padding: 3px; border-radius: 9px;
-      background: var(--surface-subtle); border: 1px solid var(--border); gap: 2px;
-    }
-    .pane-tab {
-      padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 500;
-      color: var(--muted); transition: all 0.14s;
-    }
-    .pane-tab:hover { color: var(--ink); }
-    .pane-tab.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
-
     /* Grouped Settings Cards */
     .group-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -280,12 +268,25 @@
     }
     .seg button.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 
-    .swatch-row { display: flex; align-items: center; gap: 6px; }
+    .swatch-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
     .swatch {
       width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--surface);
       box-shadow: 0 0 0 1px var(--border-strong);
     }
     .swatch.active { box-shadow: 0 0 0 2px var(--accent); }
+    .palette-btn {
+      position: relative; display: inline-flex; align-items: center; gap: 6px;
+      height: 28px; padding: 0 9px; border-radius: 7px; cursor: pointer;
+      border: 1px solid var(--border-strong); background: var(--surface);
+      font-size: 11.5px; font-weight: 500; color: var(--muted); transition: all 0.14s;
+    }
+    .palette-btn:hover { background: var(--surface-hover); color: var(--ink); }
+    .palette-btn.active { border-color: var(--accent); color: var(--ink); box-shadow: 0 0 0 2px var(--accent-soft); }
+    .palette-dot {
+      width: 13px; height: 13px; border-radius: 50%;
+      border: 1px solid rgba(15, 23, 42, 0.18); flex-shrink: 0;
+    }
+    .palette-btn input[type="color"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 
     /* Original-Style Hotkey Row */
     .hotkey-row {
@@ -313,16 +314,66 @@
     .hk-btn.del:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
     .hk-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-    .tool-sc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px 16px; }
-    .tool-sc-cell {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 6px 10px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--border); font-size: 12px;
+    /* Scoped Single-Key Tool Tiles (Option A) */
+    .scope-pill {
+      font-size: 10.5px; font-weight: 500; padding: 2px 8px; border-radius: 99px;
+      background: var(--surface-subtle); color: var(--faint); border: 1px solid var(--border);
     }
-    .tool-sc-key {
-      min-width: 30px; height: 22px; padding: 0 7px; border-radius: 5px;
+    .keytile-grid {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px; padding: 12px 14px;
+    }
+    .keytile {
+      position: relative; display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; border-radius: 9px;
+      background: var(--surface-subtle); border: 1px solid var(--border);
+      transition: all 0.14s; text-align: left; min-width: 0;
+    }
+    .keytile:hover { background: var(--surface); border-color: var(--border-strong); box-shadow: var(--shadow-card); }
+    .keytile.recording {
+      background: var(--accent-soft); border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft); animation: hkPulse 1.8s infinite;
+    }
+    .keytile.conflict {
+      background: var(--danger-soft); border-color: var(--danger);
+    }
+    .keytile-ico {
+      width: 24px; height: 24px; border-radius: 6px;
+      display: grid; place-items: center; flex-shrink: 0;
+      background: var(--surface); border: 1px solid var(--border); color: var(--ink-2);
+    }
+    .keytile-ico svg { width: 14px; height: 14px; }
+    .keytile-name {
+      flex: 1; min-width: 0; font-size: 12px; font-weight: 500; color: var(--ink);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .keytile-cap {
+      min-width: 24px; height: 22px; padding: 0 6px; border-radius: 5px; flex-shrink: 0;
       background: var(--surface); border: 1px solid var(--border-strong);
+      box-shadow: 0 1px 0 var(--border-strong);
       font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--accent);
       display: grid; place-items: center;
+    }
+    .keytile-cap.unset {
+      border-style: dashed; box-shadow: none; color: var(--faint); font-weight: 500;
+    }
+    .keytile.recording .keytile-cap {
+      background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: none;
+    }
+    .keytile.conflict .keytile-cap {
+      background: var(--danger); border-color: var(--danger); color: #fff; box-shadow: none;
+    }
+    .keytile-reset {
+      position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 99px;
+      background: var(--surface); border: 1px solid var(--border-strong); color: var(--muted);
+      font-size: 10px; display: none; place-items: center; box-shadow: var(--shadow-card);
+    }
+    .keytile.modified:hover .keytile-reset { display: grid; }
+    .keytile-reset:hover { color: var(--accent); border-color: var(--accent); }
+    .keytile-hint {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 8px 14px; border-top: 1px solid var(--border);
+      background: var(--surface-subtle); font-size: 11.5px; color: var(--muted);
     }
 
     /* Provider Cards */
@@ -445,6 +496,21 @@
     }
     .qp-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid transparent; }
     .qp-dot.active { border-color: #2563eb; transform: scale(1.12); }
+    .qp-palette {
+      position: relative; display: inline-flex; align-items: center; gap: 4px;
+      height: 22px; padding: 0 7px 0 4px; border-radius: 99px; cursor: pointer;
+      border: 1px solid rgba(15, 23, 42, 0.14); background: rgba(15, 23, 42, 0.04);
+      font-size: 11px; font-weight: 500; color: inherit; transition: all 0.12s;
+    }
+    [data-theme="dark"] .qp-palette { border-color: rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); }
+    .qp-palette:hover { border-color: #2563eb; }
+    .qp-palette.active { border-color: #2563eb; background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+    .qp-palette-wheel {
+      width: 13px; height: 13px; border-radius: 50%;
+      background: conic-gradient(#ef4444, #f59e0b, #10b981, #3b82f6, #8b5cf6, #ec4899, #ef4444);
+      border: 1px solid rgba(255,255,255,0.85); box-shadow: 0 0 0 1px rgba(15,23,42,0.15);
+    }
+    .qp-palette input[type="color"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 
     /* ══════════════════════════════════════════════════════════════
        3. REDESIGNED PINNED IMAGE SCENE — Light Native Floating Surface
@@ -710,7 +776,7 @@
           </div>
           <div style="display:flex;gap:8px;">
             <button class="pill-btn" onclick="alert('未检测到全局快捷键冲突')">检测冲突</button>
-            <button class="pill-btn" onclick="alert('已恢复全部默认快捷键')">全部恢复默认</button>
+            <button class="pill-btn" onclick="resetAllHotkeys()">全部恢复默认</button>
           </div>
         </header>
         <div class="pane-scroll">
@@ -741,164 +807,164 @@
 
             <div class="group-header"><span class="group-title">OCR 快捷键</span></div>
             <div class="s-card" id="hk-ocr"></div>
+
+            <div class="group-header">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="group-title">截图编辑器单键</span>
+                <span class="scope-pill">仅编辑器激活时生效</span>
+              </div>
+              <button class="pill-btn" style="height:24px;padding:0 9px;font-size:11px;" onclick="resetScopedKeys('editor')">恢复默认单键</button>
+            </div>
+            <div class="s-card">
+              <div class="keytile-grid" id="sk-editor"></div>
+              <div class="keytile-hint" id="sk-editor-hint">
+                <span>点击工具卡片后按任意字母或数字键修改，按 Delete 清除，Esc 取消</span>
+                <span style="color:var(--faint);">同作用域内自动检测键位冲突</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- ── PAGE 1: 截图与贴图 (顶部轻分段：保存与长截图 / 选区与贴图 / 编辑器工具键) ── -->
+      <!-- ── PAGE 1: 截图与贴图 ── -->
       <section class="main-pane hidden" id="page-screenshot">
         <header class="pane-topbar">
           <div>
             <div class="pane-title-row"><h1 class="pane-title">截图与贴图</h1><span class="save-pill">● 自动保存</span></div>
-            <p class="pane-desc">保存输出、长截图上限、选区样式、贴图行为与编辑器单键</p>
-          </div>
-          <div class="pane-tabs" data-panetabs="screenshot">
-            <button class="pane-tab active" data-panel="ss-p-output">保存与选区</button>
-            <button class="pane-tab" data-panel="ss-p-pin">贴图与缩放</button>
-            <button class="pane-tab" data-panel="ss-p-keys">编辑器按键</button>
+            <p class="pane-desc">保存输出、长截图上限、选区外观与桌面贴图行为</p>
           </div>
         </header>
         <div class="pane-scroll">
           <div class="pane-inner">
-            <div id="ss-p-output">
-              <div class="group-header"><span class="group-title">保存与长截图</span></div>
-              <div class="s-card">
-                <div class="s-row">
-                  <div class="s-info"><div class="s-label">默认保存路径</div><div class="s-sub">快捷保存（⌘⇧S）与长截图自动保存目录</div></div>
-                  <div style="display:flex;gap:6px;"><input class="input-ctrl" value="~/Pictures/SnapLingo" style="width:190px;" /><button class="pill-btn">浏览</button></div>
-                </div>
-                <div class="s-row">
-                  <div class="s-info"><div class="s-label">图片格式与命名</div><div class="s-sub">PNG / WebP 为无损压缩</div></div>
-                  <div style="display:flex;gap:8px;">
-                    <select class="select-ctrl" style="min-width:116px;"><option>PNG（无损）</option><option>JPG (92%)</option><option>WebP（无损）</option></select>
-                    <select class="select-ctrl" style="min-width:130px;"><option>日期与时间</option><option>Unix 毫秒</option><option>计数器</option><option>自定义前缀</option></select>
-                  </div>
-                </div>
-                <div class="s-row"><div class="s-info"><div class="s-label">截图后自动复制</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row">
-                  <div class="s-info"><div class="s-label">长截图最大高度</div><div class="s-sub">达到上限自动复制并保存 PNG</div></div>
-                  <div style="display:flex;align-items:center;gap:6px;"><input class="input-ctrl" type="number" value="30000" style="width:110px;min-width:0;" /><span style="font-size:12px;color:var(--muted);">px</span></div>
+            <div class="group-header"><span class="group-title">保存与长截图</span></div>
+            <div class="s-card">
+              <div class="s-row">
+                <div class="s-info"><div class="s-label">默认保存路径</div><div class="s-sub">快捷保存（⌘⇧S）与长截图自动保存目录</div></div>
+                <div style="display:flex;gap:6px;"><input class="input-ctrl" value="~/Pictures/SnapLingo" style="width:190px;" /><button class="pill-btn">浏览</button></div>
+              </div>
+              <div class="s-row">
+                <div class="s-info"><div class="s-label">图片格式与命名</div><div class="s-sub">PNG / WebP 为无损压缩</div></div>
+                <div style="display:flex;gap:8px;">
+                  <select class="select-ctrl" style="min-width:116px;"><option>PNG（无损）</option><option>JPG (92%)</option><option>WebP（无损）</option></select>
+                  <select class="select-ctrl" style="min-width:130px;"><option>日期与时间</option><option>Unix 毫秒</option><option>计数器</option><option>自定义前缀</option></select>
                 </div>
               </div>
-
-              <div class="group-header"><span class="group-title">选区外观与放大镜</span></div>
-              <div class="s-card">
-                <div class="s-row">
-                  <div class="s-info"><div class="s-label">选区边框颜色与宽度</div></div>
-                  <div style="display:flex;align-items:center;gap:12px;">
-                    <div class="swatch-row">
-                      <button class="swatch active" style="background:#5b7fff;" onclick="pickSwatch(this)"></button>
-                      <button class="swatch" style="background:#ff4d4f;" onclick="pickSwatch(this)"></button>
-                      <button class="swatch" style="background:#28a745;" onclick="pickSwatch(this)"></button>
-                      <button class="swatch" style="background:#fadb14;" onclick="pickSwatch(this)"></button>
-                    </div>
-                    <div class="range-wrap" style="width:130px;"><input type="range" min="1" max="8" value="2" oninput="this.nextElementSibling.textContent=this.value+'px'" /><span class="range-val">2px</span></div>
-                  </div>
-                </div>
-                <div class="s-row">
-                  <div class="s-info"><div class="s-label">遮罩不透明度</div></div>
-                  <div class="range-wrap"><input type="range" min="0" max="90" value="42" oninput="this.nextElementSibling.textContent=this.value+'%'" /><span class="range-val">42%</span></div>
-                </div>
-                <div class="s-row"><div class="s-info"><div class="s-label">显示选区尺寸</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row">
-                  <div class="s-info"><div class="s-label">显示像素放大镜 & 倍率</div><div class="s-sub">按住 Alt 可临时呼出放大镜与取色器</div></div>
-                  <div style="display:flex;align-items:center;gap:12px;">
-                    <div class="range-wrap" style="width:140px;"><input type="range" min="4" max="20" value="12" oninput="this.nextElementSibling.textContent=this.value+'×'" /><span class="range-val">12×</span></div>
-                    <button class="toggle on" onclick="this.classList.toggle('on')"></button>
-                  </div>
-                </div>
-                <div class="s-row"><div class="s-info"><div class="s-label">记住上次使用的标注工具</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">截图后自动复制</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row">
+                <div class="s-info"><div class="s-label">长截图最大高度</div><div class="s-sub">达到上限自动复制并保存 PNG</div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><input class="input-ctrl" type="number" value="30000" style="width:110px;min-width:0;" /><span style="font-size:12px;color:var(--muted);">px</span></div>
               </div>
             </div>
 
-            <div id="ss-p-pin" class="hidden">
-              <div class="group-header"><span class="group-title">桌面贴图设置</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">贴图初始位置</div></div><div class="seg"><button class="active" onclick="segPick(this)">截图原位置</button><button onclick="segPick(this)">桌面中央（级联）</button></div></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">贴图默认透明度</div></div><div class="range-wrap"><input type="range" min="5" max="100" value="100" oninput="this.nextElementSibling.textContent=this.value+'%'" /><span class="range-val">100%</span></div></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">贴图显示阴影</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">默认显示贴图边框</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">统一界面缩放</div><div class="s-sub">应用于设置、截图工具栏、长截图控件与光标</div></div><select class="select-ctrl"><option>自动（跟随显示器）</option><option>100%</option><option>125%</option><option>150%</option><option>175%</option><option>200%</option></select></div>
+            <div class="group-header"><span class="group-title">选区外观与放大镜</span></div>
+            <div class="s-card">
+              <div class="s-row">
+                <div class="s-info"><div class="s-label">边框宽度</div></div>
+                <div class="range-wrap"><input type="range" min="1" max="8" value="2" oninput="this.nextElementSibling.textContent=this.value+'px'" /><span class="range-val">2px</span></div>
               </div>
-            </div>
-
-            <div id="ss-p-keys" class="hidden">
-              <div class="group-header"><span class="group-title">编辑器内单键绑定（点击修改，Delete 清除）</span></div>
-              <div class="s-card">
-                <div class="tool-sc-grid">
-                  <div class="tool-sc-cell"><span>矩形框</span><button class="tool-sc-key">B</button></div>
-                  <div class="tool-sc-cell"><span>椭圆</span><button class="tool-sc-key">O</button></div>
-                  <div class="tool-sc-cell"><span>箭头</span><button class="tool-sc-key">A</button></div>
-                  <div class="tool-sc-cell"><span>直线</span><button class="tool-sc-key">L</button></div>
-                  <div class="tool-sc-cell"><span>画笔</span><button class="tool-sc-key">P</button></div>
-                  <div class="tool-sc-cell"><span>荧光笔</span><button class="tool-sc-key">H</button></div>
-                  <div class="tool-sc-cell"><span>区域高亮</span><button class="tool-sc-key">Q</button></div>
-                  <div class="tool-sc-cell"><span>模糊</span><button class="tool-sc-key">U</button></div>
-                  <div class="tool-sc-cell"><span>聚光灯</span><button class="tool-sc-key">G</button></div>
-                  <div class="tool-sc-cell"><span>马赛克</span><button class="tool-sc-key">M</button></div>
-                  <div class="tool-sc-cell"><span>文字</span><button class="tool-sc-key">T</button></div>
-                  <div class="tool-sc-cell"><span>橡皮擦</span><button class="tool-sc-key">E</button></div>
-                  <div class="tool-sc-cell"><span>长截图</span><button class="tool-sc-key">S</button></div>
-                  <div class="tool-sc-cell"><span>贴图边框</span><button class="tool-sc-key">B</button></div>
+              <div class="s-row">
+                <div class="s-info"><div class="s-label">边框颜色</div></div>
+                <div class="swatch-row">
+                  <button class="swatch active" style="background:#5b7fff;" onclick="pickSwatch(this, '#5b7fff')"></button>
+                  <button class="swatch" style="background:#ff4d4f;" onclick="pickSwatch(this, '#ff4d4f')"></button>
+                  <button class="swatch" style="background:#28a745;" onclick="pickSwatch(this, '#28a745')"></button>
+                  <button class="swatch" style="background:#fadb14;" onclick="pickSwatch(this, '#fadb14')"></button>
+                  <button class="swatch" style="background:#ffffff;" onclick="pickSwatch(this, '#ffffff')"></button>
+                  <button class="swatch" style="background:#000000;" onclick="pickSwatch(this, '#000000')"></button>
+                  <label class="palette-btn" title="自定义边框颜色">
+                    <span class="palette-dot" style="background:#5b7fff;"></span>
+                    调色板
+                    <input type="color" value="#5b7fff" oninput="pickCustomSwatch(this)" />
+                  </label>
                 </div>
               </div>
+              <div class="s-row">
+                <div class="s-info"><div class="s-label">遮罩颜色</div></div>
+                <div class="swatch-row">
+                  <button class="swatch active" style="background:rgba(0,0,0,0.45);" onclick="pickSwatch(this, '#000000')"></button>
+                  <button class="swatch" style="background:rgba(32,36,44,0.65);" onclick="pickSwatch(this, '#20242c')"></button>
+                  <button class="swatch" style="background:rgba(62,70,84,0.65);" onclick="pickSwatch(this, '#3e4654')"></button>
+                  <button class="swatch" style="background:rgba(20,55,92,0.65);" onclick="pickSwatch(this, '#14375c')"></button>
+                  <button class="swatch" style="background:rgba(25,82,72,0.65);" onclick="pickSwatch(this, '#195248')"></button>
+                  <button class="swatch" style="background:rgba(88,54,112,0.65);" onclick="pickSwatch(this, '#583670')"></button>
+                  <button class="swatch" style="background:rgba(112,68,44,0.65);" onclick="pickSwatch(this, '#70442c')"></button>
+                  <button class="swatch" style="background:rgba(255,255,255,0.65);" onclick="pickSwatch(this, '#ffffff')"></button>
+                  <label class="palette-btn" title="自定义遮罩颜色">
+                    <span class="palette-dot" style="background:#000000;"></span>
+                    调色板
+                    <input type="color" value="#000000" oninput="pickCustomSwatch(this)" />
+                  </label>
+                </div>
+              </div>
+              <div class="s-row">
+                <div class="s-info"><div class="s-label">遮罩不透明度</div></div>
+                <div class="range-wrap"><input type="range" min="0" max="90" value="42" oninput="this.nextElementSibling.textContent=this.value+'%'" /><span class="range-val">42%</span></div>
+              </div>
+              <div class="s-row"><div class="s-info"><div class="s-label">显示选区尺寸</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row">
+                <div class="s-info"><div class="s-label">显示像素放大镜 & 倍率</div><div class="s-sub">按住 Alt 可临时呼出放大镜与取色器</div></div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <div class="range-wrap" style="width:140px;"><input type="range" min="4" max="20" value="12" oninput="this.nextElementSibling.textContent=this.value+'×'" /><span class="range-val">12×</span></div>
+                  <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+                </div>
+              </div>
+              <div class="s-row"><div class="s-info"><div class="s-label">记住上次使用的标注工具</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+            </div>
+
+            <div class="group-header"><span class="group-title">桌面贴图设置</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">贴图初始位置</div></div><div class="seg"><button class="active" onclick="segPick(this)">截图原位置</button><button onclick="segPick(this)">桌面中央（级联）</button></div></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">贴图默认透明度</div></div><div class="range-wrap"><input type="range" min="5" max="100" value="100" oninput="this.nextElementSibling.textContent=this.value+'%'" /><span class="range-val">100%</span></div></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">贴图显示阴影</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">默认显示贴图边框</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">统一界面缩放</div><div class="s-sub">应用于设置、截图工具栏、长截图控件与光标</div></div><select class="select-ctrl"><option>自动（跟随显示器）</option><option>100%</option><option>125%</option><option>150%</option><option>175%</option><option>200%</option></select></div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ── PAGE 2: 翻译与识别 (整合翻译设置 + OCR 设置，顶部轻分段切换) ── -->
+      <!-- ── PAGE 2: 翻译与识别 ── -->
       <section class="main-pane hidden" id="page-translation">
         <header class="pane-topbar">
           <div>
             <div class="pane-title-row"><h1 class="pane-title">翻译与识别</h1><span class="save-pill">● 自动保存</span></div>
             <p class="pane-desc">默认语种、划词取词、结果浮窗行为与 OCR 文字处理</p>
           </div>
-          <div class="pane-tabs" data-panetabs="translation">
-            <button class="pane-tab active" data-panel="tr-p-basic">翻译偏好</button>
-            <button class="pane-tab" data-panel="tr-p-window">浮窗布局</button>
-            <button class="pane-tab" data-panel="tr-p-ocr">OCR 识别</button>
-          </div>
         </header>
         <div class="pane-scroll">
           <div class="pane-inner">
-            <div id="tr-p-basic">
-              <div class="group-header"><span class="group-title">默认语言与取词</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">源语言 → 目标语言</div></div><div style="display:flex;align-items:center;gap:8px;"><select class="select-ctrl" style="min-width:120px;"><option>自动检测</option><option>English</option><option>日本語</option></select><span style="color:var(--faint);">→</span><select class="select-ctrl" style="min-width:120px;"><option>自动</option><option>简体中文</option><option>English</option></select></div></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">划词取词模式</div><div class="s-sub">智能模式优先使用系统辅助功能，失败时回退剪贴板</div></div><div class="seg"><button class="active" onclick="segPick(this)">智能模式</button><button onclick="segPick(this)">效果优先</button><button onclick="segPick(this)">速度优先</button></div></div>
-              </div>
-              <div class="group-header"><span class="group-title">翻译行为</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">自动翻译</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">增量翻译</div><div class="s-sub">追加文字时保留已经完成的结果</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">翻译后自动复制</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">保留原文换行</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-              </div>
+            <div class="group-header"><span class="group-title">默认语言与取词</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">源语言 → 目标语言</div></div><div style="display:flex;align-items:center;gap:8px;"><select class="select-ctrl" style="min-width:120px;"><option>自动检测</option><option>English</option><option>日本語</option></select><span style="color:var(--faint);">→</span><select class="select-ctrl" style="min-width:120px;"><option>自动</option><option>简体中文</option><option>English</option></select></div></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">划词取词模式</div><div class="s-sub">智能模式优先使用系统辅助功能，失败时回退剪贴板</div></div><div class="seg"><button class="active" onclick="segPick(this)">智能模式</button><button onclick="segPick(this)">效果优先</button><button onclick="segPick(this)">速度优先</button></div></div>
             </div>
 
-            <div id="tr-p-window" class="hidden">
-              <div class="group-header"><span class="group-title">结果窗口位置与尺寸</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">划词与截图翻译窗口</div></div><select class="select-ctrl"><option>鼠标下方</option><option>鼠标位置</option><option>居中</option><option>上次停留位置</option></select></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">手动翻译窗口</div></div><select class="select-ctrl"><option>居中</option><option>鼠标下方</option><option>上次停留位置</option></select></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">窗口宽度</div></div><div class="range-wrap"><input type="range" min="300" max="1000" step="10" value="660" oninput="this.nextElementSibling.textContent=this.value+'pt'" /><span class="range-val">660pt</span></div></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">最高屏幕占比</div></div><div class="range-wrap"><input type="range" min="30" max="90" value="70" oninput="this.nextElementSibling.textContent=this.value+'%'" /><span class="range-val">70%</span></div></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">划词 / 截图原文框状态</div></div><div style="display:flex;gap:8px;"><select class="select-ctrl" style="min-width:128px;"><option>划词：上次状态</option><option>总是折叠</option><option>总是展开</option></select><select class="select-ctrl" style="min-width:128px;"><option>截图：上次状态</option><option>总是折叠</option><option>总是展开</option></select></div></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">结果窗口置顶 / 失去焦点时隐藏</div></div><div style="display:flex;align-items:center;gap:12px;"><span style="font-size:12px;color:var(--muted);">置顶</span><button class="toggle" onclick="this.classList.toggle('on')"></button><span style="font-size:12px;color:var(--muted);">失焦隐藏</span><button class="toggle on" onclick="this.classList.toggle('on')"></button></div></div>
-              </div>
+            <div class="group-header"><span class="group-title">翻译行为</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">自动翻译</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">增量翻译</div><div class="s-sub">追加文字时保留已经完成的结果</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">翻译后自动复制</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">保留原文换行</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
             </div>
 
-            <div id="tr-p-ocr" class="hidden">
-              <div class="group-header"><span class="group-title">OCR 识别与文本处理</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">识别语言</div></div><select class="select-ctrl"><option>自动检测</option><option>中文简体</option><option>中文繁體</option><option>English</option><option>日本語</option><option>한국어</option></select></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">保留文本格式</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">中文自动去除空格</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">显示识别置信度</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">OCR 窗口位置</div></div><select class="select-ctrl"><option>鼠标位置</option><option>鼠标下方</option><option>居中</option><option>上次停留位置</option></select></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">隐藏静默识别状态提示</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
-              </div>
+            <div class="group-header"><span class="group-title">结果窗口位置与尺寸</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">划词与截图翻译窗口</div></div><select class="select-ctrl"><option>鼠标下方</option><option>鼠标位置</option><option>居中</option><option>上次停留位置</option></select></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">手动翻译窗口</div></div><select class="select-ctrl"><option>居中</option><option>鼠标下方</option><option>上次停留位置</option></select></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">窗口宽度</div></div><div class="range-wrap"><input type="range" min="300" max="1000" step="10" value="660" oninput="this.nextElementSibling.textContent=this.value+'pt'" /><span class="range-val">660pt</span></div></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">最高屏幕占比</div></div><div class="range-wrap"><input type="range" min="30" max="90" value="70" oninput="this.nextElementSibling.textContent=this.value+'%'" /><span class="range-val">70%</span></div></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">划词 / 截图原文框状态</div></div><div style="display:flex;gap:8px;"><select class="select-ctrl" style="min-width:128px;"><option>划词：上次状态</option><option>总是折叠</option><option>总是展开</option></select><select class="select-ctrl" style="min-width:128px;"><option>截图：上次状态</option><option>总是折叠</option><option>总是展开</option></select></div></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">结果窗口置顶 / 失去焦点时隐藏</div></div><div style="display:flex;align-items:center;gap:12px;"><span style="font-size:12px;color:var(--muted);">置顶</span><button class="toggle" onclick="this.classList.toggle('on')"></button><span style="font-size:12px;color:var(--muted);">失焦隐藏</span><button class="toggle on" onclick="this.classList.toggle('on')"></button></div></div>
+            </div>
+
+            <div class="group-header"><span class="group-title">OCR 识别与文本处理</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">识别语言</div></div><select class="select-ctrl"><option>自动检测</option><option>中文简体</option><option>中文繁體</option><option>English</option><option>日本語</option><option>한국어</option></select></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">保留文本格式</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">中文自动去除空格</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">显示识别置信度</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">OCR 窗口位置</div></div><select class="select-ctrl"><option>鼠标位置</option><option>鼠标下方</option><option>居中</option><option>上次停留位置</option></select></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">隐藏静默识别状态提示</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
             </div>
           </div>
         </div>
@@ -911,20 +977,12 @@
             <div class="pane-title-row"><h1 class="pane-title">引擎与语音</h1><span class="save-pill">● 自动保存</span></div>
             <p class="pane-desc">翻译支持多引擎并发与拖拽排序，OCR 单选切换，含系统语音合成</p>
           </div>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div class="pane-tabs" data-panetabs="services">
-              <button class="pane-tab active" data-panel="srv-p-tr">翻译服务</button>
-              <button class="pane-tab" data-panel="srv-p-ocr">OCR 服务</button>
-              <button class="pane-tab" data-panel="srv-p-tts">语音合成</button>
-            </div>
-            <button class="pill-btn primary" onclick="alert('打开自定义 OpenAI / Claude / Gemini 翻译配置')">+ 添加 AI</button>
-          </div>
+          <button class="pill-btn primary" onclick="alert('打开自定义 OpenAI / Claude / Gemini 翻译配置')">+ 添加 AI</button>
         </header>
         <div class="pane-scroll">
           <div class="pane-inner">
-            <div id="srv-p-tr">
-              <div class="group-header"><span class="group-title">已激活：Google 翻译、DeepLX（并发对比）</span></div>
-              <div class="s-card">
+            <div class="group-header"><span class="group-title">翻译服务（已激活：Google 翻译、DeepLX，支持并发对比）</span></div>
+            <div class="s-card">
                 <div class="provider-row active-row">
                   <div class="p-avatar" style="background:#ffffff;border:1px solid var(--border);">
                     <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
@@ -967,11 +1025,9 @@
                   <button class="pill-btn" style="height:27px;font-size:11px;">配置</button>
                 </div>
               </div>
-            </div>
 
-            <div id="srv-p-ocr" class="hidden">
-              <div class="group-header"><span class="group-title">OCR 识别引擎（单选）</span></div>
-              <div class="s-card">
+            <div class="group-header"><span class="group-title">OCR 识别引擎（单选）</span></div>
+            <div class="s-card">
                 <div class="provider-row active-row">
                   <div class="p-avatar" style="background:#111827;">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="#ffffff"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
@@ -1001,15 +1057,12 @@
                   <button class="pill-btn" style="height:27px;font-size:11px;">配置</button>
                 </div>
               </div>
-            </div>
 
-            <div id="srv-p-tts" class="hidden">
-              <div class="group-header"><span class="group-title">系统语音合成（TTS）</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">语音</div></div><select class="select-ctrl"><option>系统默认</option><option>Tingting · zh-CN</option><option>Samantha · en-US</option></select></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">语速（字/分钟）</div></div><div class="range-wrap"><input type="range" min="80" max="400" step="10" value="180" oninput="this.nextElementSibling.textContent=this.value" /><span class="range-val">180</span></div></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">试听</div></div><button class="pill-btn primary" onclick="alert('正在朗读：SnapLingo 系统语音测试')">测试朗读</button></div>
-              </div>
+            <div class="group-header"><span class="group-title">系统语音合成（TTS）</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">语音</div></div><select class="select-ctrl"><option>系统默认</option><option>Tingting · zh-CN</option><option>Samantha · en-US</option></select></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">语速（字/分钟）</div></div><div class="range-wrap"><input type="range" min="80" max="400" step="10" value="180" oninput="this.nextElementSibling.textContent=this.value" /><span class="range-val">180</span></div></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">试听</div></div><button class="pill-btn primary" onclick="alert('正在朗读：SnapLingo 系统语音测试')">测试朗读</button></div>
             </div>
           </div>
         </div>
@@ -1022,52 +1075,44 @@
             <div class="pane-title-row"><h1 class="pane-title">通用设置</h1><span class="save-pill">● 自动保存</span></div>
             <p class="pane-desc">外观、启动项、权限、网络代理、数据容量与软件更新</p>
           </div>
-          <div class="pane-tabs" data-panetabs="general">
-            <button class="pane-tab active" data-panel="gen-p-basic">常规与权限</button>
-            <button class="pane-tab" data-panel="gen-p-net">网络与维护</button>
-            <button class="pane-tab" data-panel="gen-p-about">实验与关于</button>
-          </div>
         </header>
         <div class="pane-scroll">
           <div class="pane-inner">
-            <div id="gen-p-basic">
-              <div class="group-header"><span class="group-title">外观与启动</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">外观模式</div></div><div class="seg"><button class="active" onclick="setThemeMode('light', this)">浅色</button><button onclick="setThemeMode('dark', this)">深色</button><button onclick="segPick(this)">跟随系统</button></div></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">界面语言</div></div><select class="select-ctrl"><option>中文简体</option></select></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">开机自启</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-              </div>
-              <div class="group-header"><span class="group-title">系统权限</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">屏幕录制</div><div class="s-sub">用于截图、像素放大镜与长截图</div></div><span class="tag good">已授权</span></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">辅助功能</div><div class="s-sub">用于划词取词与界面元素检测</div></div><span class="tag good">已授权</span></div>
-              </div>
+            <div class="group-header"><span class="group-title">外观与启动</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">外观模式</div></div><div class="seg"><button class="active" onclick="setThemeMode('light', this)">浅色</button><button onclick="setThemeMode('dark', this)">深色</button><button onclick="segPick(this)">跟随系统</button></div></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">界面语言</div></div><select class="select-ctrl"><option>中文简体</option></select></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">开机自启</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
             </div>
 
-            <div id="gen-p-net" class="hidden">
-              <div class="group-header"><span class="group-title">网络代理与超时</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">代理设置</div></div><select class="select-ctrl"><option>跟随系统</option><option>不使用代理</option><option>手动代理</option></select></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">请求超时 / 失败重试</div></div><div style="display:flex;gap:8px;"><input class="input-ctrl" type="number" value="10000" style="width:98px;min-width:0;" /><input class="input-ctrl" type="number" value="1" style="width:68px;min-width:0;" /></div></div>
-              </div>
-              <div class="group-header"><span class="group-title">资料库容量与日志维护</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">自动清理历史记录</div><div class="s-sub">超过 30 天的非收藏记录自动删除（历史 128/5000 · 收藏 24/1000）</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">日志级别 & 保留天数</div></div><div style="display:flex;gap:8px;"><select class="select-ctrl" style="min-width:94px;"><option>Info</option><option>Debug</option><option>Warn</option></select><input class="input-ctrl" type="number" value="7" style="width:72px;min-width:0;" /></div></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">数据维护</div></div><div style="display:flex;gap:8px;"><button class="pill-btn">刷新日志</button><button class="pill-btn danger">清空日志</button><button class="pill-btn danger">清空历史</button></div></div>
-              </div>
+            <div class="group-header"><span class="group-title">系统权限</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">屏幕录制</div><div class="s-sub">用于截图、像素放大镜与长截图</div></div><span class="tag good">已授权</span></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">辅助功能</div><div class="s-sub">用于划词取词与界面元素检测</div></div><span class="tag good">已授权</span></div>
             </div>
 
-            <div id="gen-p-about" class="hidden">
-              <div class="group-header"><span class="group-title">实验性功能</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">GPU 合成加速</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
-                <div class="s-row"><div class="s-info"><div class="s-label">性能监控</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
-              </div>
-              <div class="group-header"><span class="group-title">关于 SnapLingo</span></div>
-              <div class="s-card">
-                <div class="s-row"><div class="s-info"><div class="s-label">当前版本 v0.1.33</div><div class="s-sub">MIT License · 第三方组件许可声明</div></div><div style="display:flex;gap:8px;"><button class="pill-btn">许可声明</button><button class="pill-btn primary">检查更新</button></div></div>
-              </div>
+            <div class="group-header"><span class="group-title">网络代理与超时</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">代理设置</div></div><select class="select-ctrl"><option>跟随系统</option><option>不使用代理</option><option>手动代理</option></select></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">请求超时 / 失败重试</div></div><div style="display:flex;gap:8px;"><input class="input-ctrl" type="number" value="10000" style="width:98px;min-width:0;" /><input class="input-ctrl" type="number" value="1" style="width:68px;min-width:0;" /></div></div>
+            </div>
+
+            <div class="group-header"><span class="group-title">资料库容量与日志维护</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">自动清理历史记录</div><div class="s-sub">超过 30 天的非收藏记录自动删除（历史 128/5000 · 收藏 24/1000）</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">日志级别 & 保留天数</div></div><div style="display:flex;gap:8px;"><select class="select-ctrl" style="min-width:94px;"><option>Info</option><option>Debug</option><option>Warn</option></select><input class="input-ctrl" type="number" value="7" style="width:72px;min-width:0;" /></div></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">数据维护</div></div><div style="display:flex;gap:8px;"><button class="pill-btn">刷新日志</button><button class="pill-btn danger">清空日志</button><button class="pill-btn danger">清空历史</button></div></div>
+            </div>
+
+            <div class="group-header"><span class="group-title">实验性功能</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">GPU 合成加速</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+              <div class="s-row"><div class="s-info"><div class="s-label">性能监控</div></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+            </div>
+
+            <div class="group-header"><span class="group-title">关于 SnapLingo</span></div>
+            <div class="s-card">
+              <div class="s-row"><div class="s-info"><div class="s-label">当前版本 v0.1.33</div><div class="s-sub">MIT License · 第三方组件许可声明</div></div><div style="display:flex;gap:8px;"><button class="pill-btn">许可声明</button><button class="pill-btn primary">检查更新</button></div></div>
             </div>
           </div>
         </div>
@@ -1174,6 +1219,11 @@
             <button class="qp-dot" data-color="#10b981" style="background:#10b981;"></button>
             <button class="qp-dot" data-color="#3b82f6" style="background:#3b82f6;"></button>
             <button class="qp-dot" data-color="#1e293b" style="background:#1e293b;"></button>
+            <label class="qp-palette" id="qp-palette-btn" title="自定义颜色">
+              <span class="qp-palette-wheel" id="qp-palette-dot"></span>
+              <span>调色板</span>
+              <input type="color" id="qp-color-picker" value="#ef4444" />
+            </label>
           </div>
           <div class="ot-div"></div>
           <label style="display:flex;align-items:center;gap:6px;">
@@ -1438,33 +1488,29 @@ Dieter Rams · Ten principles for good design</textarea>
       el.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
       el.classList.add('active');
     };
-    window.pickSwatch = el => {
-      el.parentElement.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    window.pickSwatch = (el, hex) => {
+      const row = el.parentElement;
+      row.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
       el.classList.add('active');
-    };
-    window.scrollToEl = (id, btn) => {
-      const target = document.getElementById(id);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      if (btn) {
-        btn.parentElement.querySelectorAll('.toc-link').forEach(l => l.classList.remove('active'));
-        btn.classList.add('active');
+      const pal = row.querySelector('.palette-btn');
+      if (pal) {
+        pal.classList.remove('active');
+        if (hex) {
+          const dot = pal.querySelector('.palette-dot');
+          const inp = pal.querySelector('input[type="color"]');
+          if (dot) dot.style.background = hex;
+          if (inp) inp.value = hex;
+        }
       }
     };
-
-    // ── Header Sub-tabs Switching ─────────────────────────────────
-    document.querySelectorAll('[data-panetabs]').forEach(group => {
-      group.querySelectorAll('.pane-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          group.querySelectorAll('.pane-tab').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          const target = btn.dataset.panel;
-          group.querySelectorAll('.pane-tab').forEach(b => {
-            const p = document.getElementById(b.dataset.panel);
-            if (p) p.classList.toggle('hidden', b.dataset.panel !== target);
-          });
-        });
-      });
-    });
+    window.pickCustomSwatch = inp => {
+      const pal = inp.parentElement;
+      const row = pal.parentElement;
+      row.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      pal.classList.add('active');
+      const dot = pal.querySelector('.palette-dot');
+      if (dot) dot.style.background = inp.value;
+    };
 
     // ── Hotkeys (Original Style) ──────────────────────────────────
     const hotkeys = {
@@ -1474,6 +1520,7 @@ Dieter Rams · Ten principles for good design</textarea>
         { label: '贴图', desc: '置顶显示选区或剪贴板中的图片', val: 'F3', def: 'F3' },
         { label: '隐藏 / 显示所有贴图', desc: '', val: '⇧F3', def: '⇧F3' },
         { label: '切换到另一贴图组', desc: '', val: '⌘F3', def: '⌘F3' },
+        { label: '贴图边框切换', desc: '在贴图窗口内切换所有贴图的边框', val: 'B', def: 'B' },
       ],
       translation: [
         { label: '划词翻译', desc: '选中文字后呼出翻译浮窗', val: '⌥D', def: '⌥D' },
@@ -1518,6 +1565,115 @@ Dieter Rams · Ten principles for good design</textarea>
     window.clearHk = (c, i) => { hotkeys[c][i].val = '未设置'; renderHotkeys(); };
     window.resetHk = (c, i) => { hotkeys[c][i].val = hotkeys[c][i].def; renderHotkeys(); };
     renderHotkeys();
+
+    // ── Scoped Single-Key Tool Tiles (Option A) ───────────────────
+    const scopedKeys = {
+      editor: [
+        { id: 'rect', name: '矩形框', key: 'B', def: 'B', svg: '<rect x="3.5" y="4.5" width="13" height="11" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/>' },
+        { id: 'ellipse', name: '椭圆', key: 'O', def: 'O', svg: '<ellipse cx="10" cy="10" rx="6.6" ry="5.2" fill="none" stroke="currentColor" stroke-width="1.7"/>' },
+        { id: 'arrow', name: '箭头', key: 'A', def: 'A', svg: '<path d="M4.2 15.8 15.2 4.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9.6 4.8h5.6v5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' },
+        { id: 'line', name: '直线', key: 'L', def: 'L', svg: '<path d="M4 15.5 16 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
+        { id: 'pen', name: '画笔', key: 'P', def: 'P', svg: '<path d="M3.8 14.2c1.8-4 4.2-4 6 0s4.2 4 6.4-2.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>' },
+        { id: 'highlighter', name: '荧光笔', key: 'H', def: 'H', svg: '<path d="m11.8 4.2 4 4-6.4 6.4-4-4 6.4-6.4ZM4.2 15.8h4.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' },
+        { id: 'highlightArea', name: '区域高亮', key: 'Q', def: 'Q', svg: '<rect x="3.5" y="4.5" width="13" height="11" rx="1.6" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.6 2"/>' },
+        { id: 'blur', name: '模糊', key: 'U', def: 'U', svg: '<circle cx="10" cy="10" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.2 2"/><circle cx="10" cy="10" r="2.6" fill="currentColor" fill-opacity="0.35"/>' },
+        { id: 'spotlight', name: '聚光灯', key: 'G', def: 'G', svg: '<circle cx="10" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M10 3v1.8M10 15.2V17M3 10h1.8M15.2 10H17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' },
+        { id: 'mosaic', name: '马赛克', key: 'M', def: 'M', svg: '<rect x="3.6" y="3.6" width="5.2" height="5.2" rx="1" fill="currentColor"/><rect x="11.2" y="3.6" width="5.2" height="5.2" rx="1" fill="currentColor" fill-opacity="0.35"/><rect x="3.6" y="11.2" width="5.2" height="5.2" rx="1" fill="currentColor" fill-opacity="0.35"/><rect x="11.2" y="11.2" width="5.2" height="5.2" rx="1" fill="currentColor"/>' },
+        { id: 'text', name: '文字', key: 'T', def: 'T', svg: '<path d="M4.5 5.2h11M10 5.2v10.4M7.4 15.6h5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
+        { id: 'eraser', name: '橡皮擦', key: 'E', def: 'E', svg: '<path d="m11.4 4.2 4.6 4.6-6.2 6.2H5.6L3.6 13l7.8-8.8Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.8 15h6.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' },
+        { id: 'scroll', name: '长截图', key: 'S', def: 'S', svg: '<rect x="5" y="3.2" width="10" height="13.6" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 6.5v7M7.8 11.4 10 13.6l2.2-2.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' },
+      ],
+    };
+    let recordingTile = null;
+    let conflictNotice = '';
+
+    function renderScopedKeys() {
+      ['editor'].forEach(scope => {
+        const list = scopedKeys[scope];
+        const counts = {};
+        list.forEach(item => { if (item.key) counts[item.key] = (counts[item.key] || 0) + 1; });
+        const box = document.getElementById(`sk-${scope}`);
+        box.innerHTML = list.map((item, idx) => {
+          const isRec = recordingTile && recordingTile.scope === scope && recordingTile.idx === idx;
+          const isMod = item.key !== item.def;
+          const isConflict = item.key && counts[item.key] > 1;
+          return `
+            <div class="keytile ${isRec ? 'recording' : ''} ${isMod ? 'modified' : ''} ${isConflict ? 'conflict' : ''}" role="button" tabindex="0" onclick="startRecordTile('${scope}', ${idx})">
+              <span class="keytile-ico"><svg viewBox="0 0 20 20">${item.svg}</svg></span>
+              <span class="keytile-name">${item.name}</span>
+              <span class="keytile-cap ${!item.key && !isRec ? 'unset' : ''}">${isRec ? '…' : (item.key || '—')}</span>
+              ${isMod ? `<button class="keytile-reset" title="恢复默认 (${item.def})" onclick="event.stopPropagation();resetOneTile('${scope}', ${idx})">↺</button>` : ''}
+            </div>
+          `;
+        }).join('');
+      });
+      const hint = document.getElementById('sk-editor-hint');
+      if (hint) {
+        if (conflictNotice) {
+          hint.innerHTML = `<span style="color:var(--danger);font-weight:500;">${conflictNotice}</span><span style="color:var(--faint);">按 Esc 取消录制</span>`;
+        } else if (recordingTile) {
+          const cur = scopedKeys[recordingTile.scope][recordingTile.idx];
+          hint.innerHTML = `<span style="color:var(--accent);font-weight:500;">正在为「${cur.name}」录制单键 — 请按字母或数字键</span><span style="color:var(--faint);">Delete 清除 · Esc 取消</span>`;
+        } else {
+          hint.innerHTML = `<span>点击工具卡片后按任意字母或数字键修改，按 Delete 清除，Esc 取消</span><span style="color:var(--faint);">同作用域内自动检测键位冲突</span>`;
+        }
+      }
+    }
+    window.startRecordTile = (scope, idx) => {
+      conflictNotice = '';
+      if (recordingTile && recordingTile.scope === scope && recordingTile.idx === idx) {
+        recordingTile = null;
+      } else {
+        recordingTile = { scope, idx };
+      }
+      renderScopedKeys();
+    };
+    window.resetOneTile = (scope, idx) => {
+      scopedKeys[scope][idx].key = scopedKeys[scope][idx].def;
+      conflictNotice = '';
+      renderScopedKeys();
+    };
+    window.resetScopedKeys = scope => {
+      scopedKeys[scope].forEach(it => { it.key = it.def; });
+      recordingTile = null;
+      conflictNotice = '';
+      renderScopedKeys();
+    };
+    window.resetAllHotkeys = () => {
+      Object.keys(hotkeys).forEach(cat => hotkeys[cat].forEach(h => { h.val = h.def; }));
+      Object.keys(scopedKeys).forEach(scope => scopedKeys[scope].forEach(it => { it.key = it.def; }));
+      recordingTile = null;
+      conflictNotice = '';
+      renderHotkeys();
+      renderScopedKeys();
+    };
+    window.addEventListener('keydown', e => {
+      if (!recordingTile) return;
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      e.preventDefault();
+      const { scope, idx } = recordingTile;
+      const item = scopedKeys[scope][idx];
+      if (e.key === 'Escape') {
+        recordingTile = null; conflictNotice = ''; renderScopedKeys(); return;
+      }
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        item.key = ''; recordingTile = null; conflictNotice = ''; renderScopedKeys(); return;
+      }
+      if (/^[a-zA-Z0-9]$/.test(e.key)) {
+        const k = e.key.toUpperCase();
+        const dup = scopedKeys[scope].find((it, i) => i !== idx && it.key === k);
+        if (dup) {
+          conflictNotice = `键位「${k}」已被「${dup.name}」占用，已自动清空「${dup.name}」并绑定到「${item.name}」`;
+          dup.key = '';
+        } else {
+          conflictNotice = '';
+        }
+        item.key = k;
+        recordingTile = null;
+        renderScopedKeys();
+      }
+    });
+    renderScopedKeys();
 
     // ── Scene & Page Navigation ───────────────────────────────────
     const sceneTabs = document.querySelectorAll('.scene-tab');
@@ -1673,7 +1829,19 @@ Dieter Rams · Ten principles for good design</textarea>
     document.querySelectorAll('#qp-colors .qp-dot').forEach(d => d.addEventListener('click', () => {
       document.querySelectorAll('#qp-colors .qp-dot').forEach(x => x.classList.remove('active'));
       d.classList.add('active'); capColor = d.dataset.color;
+      const pal = document.getElementById('qp-palette-btn');
+      if (pal) pal.classList.remove('active');
+      const picker = document.getElementById('qp-color-picker');
+      if (picker) picker.value = capColor;
     }));
+    document.getElementById('qp-color-picker').addEventListener('input', e => {
+      capColor = e.target.value;
+      document.querySelectorAll('#qp-colors .qp-dot').forEach(x => x.classList.remove('active'));
+      const pal = document.getElementById('qp-palette-btn');
+      if (pal) pal.classList.add('active');
+      const dot = document.getElementById('qp-palette-dot');
+      if (dot) dot.style.background = capColor;
+    });
     document.getElementById('cap-width').addEventListener('input', e => { capWidth = Number(e.target.value); document.getElementById('cap-width-val').textContent = capWidth + 'px'; });
     document.getElementById('cap-fill-btn').addEventListener('click', function () { capFill = !capFill; this.textContent = capFill ? '填充模式' : '边框模式'; this.classList.toggle('active', capFill); });
     document.getElementById('cap-undo').addEventListener('click', () => { if (capIdx > 0) { capIdx--; paintCap(capHistory[capIdx]); } });

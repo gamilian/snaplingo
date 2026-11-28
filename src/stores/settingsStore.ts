@@ -1,25 +1,19 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type {
-  MainTab,
-  ServicesSubTab,
-} from '../views/SettingsWindow/navigationModel';
+import type { MainTab } from '../views/SettingsWindow/navigationModel';
 import type { SettingsNavigationRequest } from '../application/settings/navigation';
 
 interface SettingsState {
   activeMainTab: MainTab;
-  servicesSubTab: ServicesSubTab;
   requestedSection: string | null;
 
   setActiveMainTab: (tab: MainTab) => void;
-  setServicesSubTab: (tab: SettingsState['servicesSubTab']) => void;
   navigate: (request: SettingsNavigationRequest) => void;
   consumeRequestedSection: () => void;
 }
 
 interface PersistedSettingsState {
   activeMainTab?: MainTab;
-  servicesSubTab?: ServicesSubTab;
 }
 
 function mergePersistedState(state: SettingsState, persistedState: unknown): SettingsState {
@@ -31,13 +25,13 @@ function mergePersistedState(state: SettingsState, persistedState: unknown): Set
   return {
     ...state,
     activeMainTab,
-    servicesSubTab: persisted.servicesSubTab ?? state.servicesSubTab,
     requestedSection: null,
   };
 }
 
 function isMainTab(value: unknown): value is MainTab {
   return [
+    'overview',
     'general',
     'screenshot',
     'translation',
@@ -51,14 +45,12 @@ function isMainTab(value: unknown): value is MainTab {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      activeMainTab: 'screenshot',
-      servicesSubTab: 'ocr',
+      activeMainTab: 'overview',
       requestedSection: null,
       setActiveMainTab: (tab) =>
         set({ activeMainTab: tab, requestedSection: null }),
-      setServicesSubTab: (tab) => set({ servicesSubTab: tab }),
       navigate: ({ tab, section }) =>
-        set({ activeMainTab: tab, requestedSection: section ?? null }),
+        set({ activeMainTab: section === 'hotkeys' ? 'overview' : tab, requestedSection: section === 'hotkeys' ? tab : section ?? null }),
       consumeRequestedSection: () => set({ requestedSection: null }),
     }),
     {
@@ -66,7 +58,6 @@ export const useSettingsStore = create<SettingsState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         activeMainTab: state.activeMainTab,
-        servicesSubTab: state.servicesSubTab,
       }),
       merge: (persistedState, currentState) =>
         mergePersistedState(currentState, persistedState),

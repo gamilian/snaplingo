@@ -33,7 +33,8 @@ export function GeneralPage() {
 
   return (
     <SettingsScrollPage
-      title={t('general')}
+      title="通用设置"
+      description="外观、启动项、权限、网络代理、数据容量与软件更新"
      
       autoSaveLabel={t('autoSave')}
       requestedSectionId={requestedSection}
@@ -87,6 +88,11 @@ export function GeneralPage() {
           id: 'network',
           label: t('network'),
           content: <NetworkSettings />,
+        },
+        {
+          id: 'capacity',
+          label: '资料库容量',
+          content: <LibraryCapacitySettings />,
         },
         {
           id: 'maintenance',
@@ -223,6 +229,18 @@ function NetworkSettings() {
       </SettingRow>
     </SettingsGroup>
   );
+}
+
+function LibraryCapacitySettings() {
+  const history = useSettingsConfigStore((state) => state.history);
+  const updateHistory = useSettingsConfigStore((state) => state.updateHistorySettings);
+  if (!history) return null;
+  return <SettingsGroup>
+    <SettingRow label="自动清理历史记录" description="自动清理超过保留天数的历史记录，收藏不受影响。"><SettingsToggle label="自动清理历史记录" checked={history.autoCleanupEnabled} onChange={(autoCleanupEnabled) => void updateHistory({ ...history, autoCleanupEnabled })} /></SettingRow>
+    <SettingRow label="历史记录保留天数"><CustomNumberInput value={history.retentionDays} min={1} max={365} step={1} suffix="天" className="w-[230px]" onChange={(retentionDays) => void updateHistory({ ...history, retentionDays })} /></SettingRow>
+    <SettingRow label="最多保留记录数"><CustomNumberInput value={history.maximumRecords} min={100} max={100000} step={100} className="w-[230px]" onChange={(maximumRecords) => void updateHistory({ ...history, maximumRecords })} /></SettingRow>
+    <SettingRow label="收藏夹容量"><CustomNumberInput value={history.maximumFavorites} min={100} max={100000} step={100} className="w-[230px]" onChange={(maximumFavorites) => void updateHistory({ ...history, maximumFavorites })} /></SettingRow>
+  </SettingsGroup>;
 }
 
 function MaintenanceSettings() {

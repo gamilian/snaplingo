@@ -1,17 +1,10 @@
 import type { OcrSettings, ResultWindowPosition } from '../../../application/settings/ports';
 import { CustomSelect } from '../../../components/common/CustomSelect';
 import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
-import { FeatureHotkeysSection, HotkeyToolbar } from '../Hotkey/FeatureHotkeysSection';
 import { SettingRow, SettingsGroup, SettingsToggle } from '../SettingsControls';
 import { SettingsScrollPage } from '../SettingsScrollPage';
 
-const OCR_HOTKEYS = [
-  { key: 'screenshot-ocr', label: '截图 OCR' },
-  { key: 'silent-screenshot-ocr', label: '静默截图 OCR' },
-  { key: 'file-ocr', label: '上传图片 OCR' },
-];
-
-export function OcrSettingsScrollPage() {
+export function OcrSettingsScrollPage({ contentOnly = false }: { contentOnly?: boolean } = {}) {
   const ocr = useSettingsConfigStore((state) => state.ocr);
   const updateOcrSettings = useSettingsConfigStore(
     (state) => state.updateOcrSettings,
@@ -28,19 +21,12 @@ export function OcrSettingsScrollPage() {
   return (
     <SettingsScrollPage
       title="OCR"
+      contentOnly={contentOnly}
      
       sections={[
         {
-          id: 'hotkeys',
-          label: '快捷键',
-          action: <HotkeyToolbar category="ocr" actions={OCR_HOTKEYS} />,
-          content: (
-            <FeatureHotkeysSection category="ocr" actions={OCR_HOTKEYS} />
-          ),
-        },
-        {
           id: 'recognition',
-          label: '识别与文本',
+          label: 'OCR 识别与文本处理',
           content: (
             <SettingsGroup>
               <SettingRow label="识别语言">
@@ -86,7 +72,7 @@ export function OcrSettingsScrollPage() {
         },
         {
           id: 'window',
-          label: '窗口与提示',
+          label: 'OCR 窗口与提示',
           content: (
             <>
               <SettingsGroup>

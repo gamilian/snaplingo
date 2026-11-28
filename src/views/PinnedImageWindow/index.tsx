@@ -1,4 +1,5 @@
 import { sampleCanvasColor } from '../shared/imageSampling';
+import { CloseIcon, CopyIcon, RetryIcon } from '../../components/common/WindowIcons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import type { PinnedImageView } from '../../domain/capture';
@@ -9,6 +10,7 @@ import {
   usePinnedImageRuntime,
 } from './runtimeContext';
 import {
+  PINNED_DOCK_HEIGHT,
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
   getPinnedImagePointFromPointer,
@@ -46,7 +48,6 @@ import {
   getMagnifierPosition,
 } from '../../application/image-inspection/magnifier';
 import {
-  getPinnedHoverToolbarActions,
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isCopyPinnedTextShortcut,
@@ -58,7 +59,6 @@ import {
 } from '../../application/pinned-image/input';
 
 const PIN_CONTEXT_MENU_SIZE = { width: 184, height: 428 };
-const PIN_HOVER_TOOLBAR_ACTIONS = getPinnedHoverToolbarActions();
 const PIN_MAGNIFIER_SIZE = { width: 160, height: 112 };
 const PIN_MAGNIFIER_GAP = 14;
 const PIN_MAGNIFIER_ZOOM = 8;
@@ -139,13 +139,14 @@ function PinnedImageWindowContent() {
   const [isMagnifierRequested, setIsMagnifierRequested] = useState(false);
   const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
   const [isHoverToolbarForcedVisible, setIsHoverToolbarForcedVisible] =
-    useState(false);
+    useState(true);
   const [error, setError] = useState<string | null>(null);
   const togglePinBorder = useCallback(() => {
     void updateScreenshotSettings({ pinBorder: !pinBorder }).catch((error) => setError(String(error)));
   }, [pinBorder, updateScreenshotSettings]);
   useEffect(() => {
     const handleBorderKey = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement) return;
       if (isPinBorderShortcut(event, pinBorderShortcut)) {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -200,6 +201,7 @@ function PinnedImageWindowContent() {
       .then((nextImage) => {
         if (!disposed && nextImage) {
           setImage(nextImage);
+          void runtime.resize({ zoom: 1, transform: createDefaultPinnedTransform(), thumbnailMode: false });
         }
       })
       .catch((err) => {
@@ -445,6 +447,7 @@ function PinnedImageWindowContent() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement) return;
       if (isPinnedMagnifierShortcut(event)) {
         event.preventDefault();
         setIsMagnifierRequested(true);
@@ -709,25 +712,6 @@ function PinnedImageWindowContent() {
   const colorText = cursorColor
     ? colorSampleToClipboardText(cursorColor, colorSampleFormat)
     : '';
-  const runHoverToolbarAction = (actionId: typeof PIN_HOVER_TOOLBAR_ACTIONS[number]['id']) => {
-    setIsHoverToolbarForcedVisible(false);
-
-    if (actionId === 'copy') {
-      void copyCurrentPinnedImage();
-      return;
-    }
-
-    if (actionId === 'save') {
-      void savePinnedImageAs();
-      return;
-    }
-
-    void hideCurrentPinnedImage();
-  };
-  const hoverToolbarVisibilityClassName = isHoverToolbarForcedVisible
-    ? 'opacity-100'
-    : 'opacity-0 focus-within:opacity-100 group-hover:opacity-100';
-
   return (
     <div
       className="group relative h-screen w-screen overflow-hidden bg-transparent"
@@ -735,6 +719,7 @@ function PinnedImageWindowContent() {
       onContextMenu={handleContextMenu}
       onPointerDown={() => setContextMenuPosition(null)}
     >
+      <div className="pin-image-area" style={{ bottom: PINNED_DOCK_HEIGHT }}>
       {image && imageFrameSize && (
         <div
           ref={imageFrameRef}
@@ -782,6 +767,7 @@ function PinnedImageWindowContent() {
           {pinBorder && <div aria-hidden="true" className="pointer-events-none absolute inset-0 border border-blue-500" />}
         </div>
       )}
+      </div>
       {isMagnifierShown &&
         magnifierPosition &&
         magnifierImageStyle &&
@@ -909,22 +895,18 @@ function PinnedImageWindowContent() {
           </button>
         </div>
       )}
-      <div
-        className={`pin-toolbar absolute right-1 top-1 flex gap-0.5 rounded-md bg-surface/95 p-[3px] text-label text-muted shadow-e2 ring-1 ring-line backdrop-blur-md transition-opacity ${hoverToolbarVisibilityClassName}`}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        {PIN_HOVER_TOOLBAR_ACTIONS.map((action) => (
-          <button
-            key={action.id}
-            type="button"
-            className="h-6 rounded-sm px-2 leading-6 hover:bg-raised hover:text-ink focus:bg-raised focus:text-ink"
-            aria-label={action.ariaLabel}
-            title={action.title}
-            onClick={() => runHoverToolbarAction(action.id)}
-          >
-            {action.label}
-          </button>
-        ))}
+      <div className="pin-dock-area" style={{ height: PINNED_DOCK_HEIGHT }} onWheel={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
+        <div className="pin-toolbar" role="toolbar" aria-label="贴图工具栏" style={{ visibility: isHoverToolbarForcedVisible ? 'visible' : 'hidden' }}>
+          <button type="button" aria-label="切换贴图边框" aria-pressed={pinBorder} title="切换边框" onClick={togglePinBorder}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="16" height="16" rx="2.5" /></svg></button>
+          <button type="button" aria-label="灰度显示" aria-pressed={visualFilter.grayscale} title="灰度显示 (5)" onClick={() => setVisualFilter((current) => nextPinnedVisualFilter(current, 'toggle-grayscale'))}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8" /><path d="M12 4v16M12 8h6.9M12 12h8M12 16h6.9" /></svg></button>
+          <button type="button" aria-label="反色显示" aria-pressed={visualFilter.inverted} title="反色显示 (6)" onClick={() => setVisualFilter((current) => nextPinnedVisualFilter(current, 'toggle-invert'))}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8" /><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor" /></svg></button>
+          <label>缩放<input type="range" aria-label="贴图缩放" min="10" max="800" step="10" value={Math.round(zoom * 100)} onChange={(event) => { const nextZoom = Number(event.currentTarget.value) / 100; setZoom(nextZoom); setIsThumbnailMode(false); void resizePinnedWindow(nextZoom, transform, false); }} /><output>{Math.round(zoom * 100)}%</output></label>
+          <label>透明度<input type="range" aria-label="贴图透明度" min="5" max="100" value={Math.round(opacity * 100)} onChange={(event) => setOpacity(Number(event.currentTarget.value) / 100)} /><output>{Math.round(opacity * 100)}%</output></label>
+          <button type="button" aria-label="重置大小与透明度" title="重置大小与透明度" onClick={resetPinnedSizeAndOpacity}><RetryIcon /></button>
+          <button type="button" aria-label="复制贴图" title="复制" onClick={() => void copyCurrentPinnedImage()}><CopyIcon /></button>
+          <button type="button" aria-label="保存贴图" title="另存为" onClick={() => void savePinnedImageAs()}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v11m-4-4 4 4 4-4M5 19h14" /></svg></button>
+          <button type="button" aria-label="关闭当前贴图" title="关闭当前贴图" onClick={() => void destroyCurrentPinnedImage()}><CloseIcon /></button>
+        </div>
       </div>
     </div>
   );

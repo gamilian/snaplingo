@@ -6,17 +6,19 @@ import {
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { PinnedWindowPort } from '../../application/pinned-image/ports';
 let resizeTail = Promise.resolve();
+let currentBottomInset = 0;
 
 export const pinnedWindow: PinnedWindowPort = {
-  resize(width, height) {
+  resize(width, height, bottomInset = 0) {
     const operation = resizeTail.then(async () => {
       const window = getCurrentWindow();
       const [position, size, scale] = await Promise.all([window.outerPosition(), window.outerSize(), window.scaleFactor()]);
       await window.setSize(new LogicalSize(width, height));
       await window.setPosition(new PhysicalPosition(
         Math.round(position.x + (size.width - width * scale) / 2),
-        Math.round(position.y + (size.height - height * scale) / 2),
+        Math.round(position.y + (size.height - currentBottomInset * scale - (height - bottomInset) * scale) / 2),
       ));
+      currentBottomInset = bottomInset;
     });
     resizeTail = operation.catch(() => {});
     return operation;

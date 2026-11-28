@@ -17,6 +17,8 @@ import {
 } from '../../application/translation/languages';
 import TranslationCard from './TranslationCard';
 import { CustomSelect } from '../../components/common/CustomSelect';
+import { ProviderBrandIcon } from '../../components/common/ProviderBrandIcon';
+import type { Provider } from '../../application/settings/configuration';
 import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
 import IconActionButton from '../../components/common/IconActionButton';
 import ResultWindowScrollArea from './ResultWindowScrollArea';
@@ -57,10 +59,8 @@ import {
   CloseIcon,
   CopyIcon,
   FavoriteIcon,
-  LanguageIcon,
   PinIcon,
   RetryIcon,
-  ScanIcon,
   SwapIcon,
   UploadIcon,
   VolumeIcon,
@@ -85,6 +85,7 @@ interface ResultWindowProps {
 
 function Header({
   mode,
+  ocrProvider,
   subtitle,
   busy,
   isPinned,
@@ -93,6 +94,7 @@ function Header({
   onClose,
 }: {
   mode: 'translation' | 'ocr';
+  ocrProvider?: Provider | null;
   subtitle: string;
   busy: boolean;
   isPinned: boolean;
@@ -124,17 +126,11 @@ function Header({
           onStartDrag();
         }}
       >
-        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-accent-soft text-accent-text">
-          {isOcr ? (
-            <ScanIcon className="h-4 w-4" />
-          ) : (
-            <LanguageIcon className="h-4 w-4" />
-          )}
-        </div>
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
           <h2 className="text-base font-bold leading-tight text-ink">
             {isOcr ? 'OCR' : '翻译'}
           </h2>
+          {isOcr && ocrProvider && <span className="inline-flex items-center gap-1 rounded-full bg-good-soft px-2 py-0.5 text-hint text-good"><ProviderBrandIcon {...ocrProvider} small />{ocrProvider.name}</span>}
           <span role={busy ? 'status' : undefined} aria-live={busy ? 'polite' : undefined} className="inline-flex items-center gap-2 text-xs font-semibold text-muted">
             {busy && <span aria-hidden="true" className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
             {subtitle}
@@ -258,6 +254,7 @@ function ResultWindowContent({
     resultWindowMode,
     resultWindowOrigin,
     translationProviders,
+    ocrProvider,
     translationSettings,
     ocrSettings,
   } = useResultWindowProjection();
@@ -742,6 +739,7 @@ function ResultWindowContent({
       >
         <Header
           mode={isOcrMode ? 'ocr' : 'translation'}
+          ocrProvider={ocrProvider}
           subtitle={isOcrRunning ? '正在识别图片…' : isOcrMode ? ocrSubtitle : translationSubtitle}
           busy={isOcrRunning || isTranslating}
           isPinned={isResultWindowPinned}
@@ -762,7 +760,7 @@ function ResultWindowContent({
             )}
             {ocrImageBase64 ? (
               <div className={resultWindowOcrResultStackClassName()}>
-                <div className="flex min-h-0 flex-col gap-2">
+                <div className="ocr-source-card flex min-h-0 flex-col gap-2">
                   <div className="flex min-h-[18px] items-center justify-between gap-3">
                     <h3 className="text-card font-bold text-muted">原图</h3>
                     <span className="text-hint text-faint">source</span>
@@ -790,18 +788,17 @@ function ResultWindowContent({
                   </button>
                 </div>
 
-                <div className="flex min-h-0 flex-col gap-3">
+                <div className="ocr-result-column flex min-h-0 flex-col gap-3">
                   <div className="flex min-h-[18px] items-center justify-between gap-3">
-                    <h3 className="text-card font-bold text-muted">OCR 结果</h3>
-                    <span className="text-hint text-faint">
-                      {ocrText ? `${ocrText.length} chars` : 'No text'}
-                    </span>
+                    <h3 className="text-card font-bold text-muted">识别结果</h3>
+                    <button type="button" className="ocr-translate-button" disabled={!ocrText.trim() || isOcrRunning} onClick={() => void runtime.applyPayload({ mode: 'translation', text: ocrText, origin: 'ocr', autoTranslate: true })}>一键翻译 →</button>
                   </div>
                   <div className={resultWindowOcrFullTextBoxClassName()}>
                     <textarea
                       ref={ocrImageTextAreaRef}
                       value={ocrText}
-                      readOnly
+                      aria-label="识别结果"
+                      onChange={(event) => runtime.updateOcrText(event.currentTarget.value)}
                       placeholder={isOcrRunning ? '正在识别图片…' : 'OCR 结果...'}
                       rows={resultWindowTextAreaRows(ocrText, 'ocr')}
                       className={resultWindowOcrResultTextAreaClassName()}
@@ -916,7 +913,7 @@ function ResultWindowContent({
                     type="button"
                     onClick={handleUploadImage}
                     disabled={isOcrRunning}
-                    className="grid min-h-[92px] w-full place-items-center rounded-xl border border-dashed border-line-strong bg-gradient-to-b from-slate-50 to-white px-3 py-3 text-center transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-50/30 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="grid min-h-[92px] w-full place-items-center rounded-xl border border-dashed border-line-strong bg-sunken px-3 py-3 text-center transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-50/30 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <span className="grid justify-items-center gap-3">
                       <span className="grid h-9 w-9 place-items-center rounded-md bg-emerald-50 text-emerald-700">
@@ -943,7 +940,8 @@ function ResultWindowContent({
                     <textarea
                       ref={ocrTextAreaRef}
                       value={ocrText}
-                      readOnly
+                      aria-label="识别结果"
+                      onChange={(event) => runtime.updateOcrText(event.currentTarget.value)}
                       rows={resultWindowTextAreaRows(ocrText, 'ocr')}
                       placeholder={isOcrRunning ? '正在识别图片…' : 'OCR 结果...'}
                       className={resultWindowTextAreaClassName('ocr')}
@@ -1165,6 +1163,8 @@ function ResultWindowContent({
                         result.provider_id,
                         translationProviders,
                       )}
+                      providerProtocol={translationProviders.find((provider) => provider.id === result.provider_id)?.protocol}
+                      providerEndpoint={translationProviders.find((provider) => provider.id === result.provider_id)?.endpoint}
                       status={result.status}
                       text={result.error?.message ?? result.translated_text}
                       languageCode={resolvedTargetLanguage}

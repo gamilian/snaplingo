@@ -1,11 +1,8 @@
 import type { ReactNode } from 'react';
-import { AnnotationShortcutSettings } from './AnnotationShortcutSettings';
-import { PinBorderShortcutSettings } from './PinBorderShortcutSettings';
 import type { AnnotationColorPreset, ScreenshotSettings } from '../../../application/settings/ports';
 import { CustomRange } from '../../../components/common/CustomRange';
 import { CustomSelect } from '../../../components/common/CustomSelect';
 import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
-import { FeatureHotkeysSection, HotkeyToolbar } from '../Hotkey/FeatureHotkeysSection';
 import { SettingRow, SettingsGroup, SettingsToggle } from '../SettingsControls';
 import { SettingsScrollPage } from '../SettingsScrollPage';
 import { useSettingsRuntime } from '../runtimeContext';
@@ -34,14 +31,6 @@ const BORDER_COLORS: AnnotationColorPreset[] = [
   [250, 219, 20, 242],
   [255, 255, 255, 242],
   [0, 0, 0, 242],
-];
-
-const SCREENSHOT_HOTKEYS = [
-  { key: 'screenshot', label: '截屏' },
-  { key: 'screenshot-copy', label: '截屏并自动复制' },
-  { key: 'pin', label: '贴图' },
-  { key: 'pin-toggle-all', label: '隐藏 / 显示所有贴图' },
-  { key: 'pin-switch-group', label: '切换到另一贴图组' },
 ];
 
 export function ScreenshotSettingsPage() {
@@ -314,6 +303,11 @@ export function ScreenshotSettingsPage() {
           </RangeValue>
         </SettingRow>
       </SettingsGroup>
+
+    </>
+  );
+
+  const pinSettings = (
       <SettingsGroup>
         <SettingRow label="贴图默认透明度">
           <RangeValue value={`${screenshot.pinOpacity}%`}>
@@ -351,31 +345,14 @@ export function ScreenshotSettingsPage() {
           /></div>
         </SettingRow>
       </SettingsGroup>
-    </>
   );
 
   return (
     <SettingsScrollPage
-      title="截图"
+      title="截图与贴图"
+      description="保存输出、长截图上限、选区外观与桌面贴图行为"
      
       sections={[
-        {
-          id: 'hotkeys',
-          label: '快捷键',
-          action: (
-            <HotkeyToolbar category="screenshot" actions={SCREENSHOT_HOTKEYS} />
-          ),
-          content: (
-            <>
-            <FeatureHotkeysSection
-              category="screenshot"
-              actions={SCREENSHOT_HOTKEYS}
-            />
-            <AnnotationShortcutSettings value={screenshot.annotationToolShortcuts} onUpdate={(annotationToolShortcuts) => updateScreenshotSettings({ annotationToolShortcuts })} />
-            <SettingsGroup><PinBorderShortcutSettings value={screenshot.pinBorderShortcut} onUpdate={(pinBorderShortcut) => updateScreenshotSettings({ pinBorderShortcut })} /></SettingsGroup>
-            </>
-          ),
-        },
         {
           id: 'output',
           label: '保存与输出',
@@ -383,9 +360,10 @@ export function ScreenshotSettingsPage() {
         },
         {
           id: 'capture-interface',
-          label: '截图界面',
+          label: '选区外观与放大镜',
           content: captureInterfaceSettings,
         },
+        { id: 'pin', label: '桌面贴图设置', content: pinSettings },
       ]}
     />
   );

@@ -44,7 +44,7 @@ describe('settingsStore navigation persistence', () => {
     const state = useSettingsStore.getState() as unknown as Record<string, unknown>;
 
     expect(state.activeMainTab).toBe('translation');
-    expect(state.servicesSubTab).toBe('translation');
+    expect('servicesSubTab' in state).toBe(false);
     expect('hotkeys' in state).toBe(false);
     expect('language' in state).toBe(false);
     expect('theme' in state).toBe(false);
@@ -58,8 +58,16 @@ describe('settingsStore navigation persistence', () => {
     });
     const { useSettingsStore } = await import('./settingsStore');
 
-    expect(useSettingsStore.getState().activeMainTab).toBe('screenshot');
-    expect(useSettingsStore.getState().servicesSubTab).toBe('translation');
+    expect(useSettingsStore.getState().activeMainTab).toBe('overview');
+    expect(useSettingsStore.getState()).not.toHaveProperty('servicesSubTab');
+  });
+
+  it('routes previous feature hotkey links into the unified shortcut page', async () => {
+    const { useSettingsStore } = await import('./settingsStore');
+    for (const tab of ['screenshot', 'translation', 'ocr'] as const) {
+      useSettingsStore.getState().navigate({ tab, section: 'hotkeys' });
+      expect(useSettingsStore.getState()).toMatchObject({ activeMainTab: 'overview', requestedSection: tab });
+    }
   });
 
   it('keeps one-shot section requests out of persisted navigation state', async () => {

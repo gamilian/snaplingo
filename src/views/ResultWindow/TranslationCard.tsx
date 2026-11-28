@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ProviderBrandIcon } from '../../components/common/ProviderBrandIcon';
 import type { ProviderTranslationStatus } from '../../application/result-window/projection';
 import {
   ChevronDownIcon,
@@ -14,6 +15,8 @@ import { resultWindowAdaptiveTextStyle } from './presentation';
 interface TranslationCardProps {
   providerId: string;
   providerName?: string;
+  providerProtocol?: string;
+  providerEndpoint?: string;
   status: ProviderTranslationStatus;
   text: string;
   detectedLanguage?: string;
@@ -26,16 +29,11 @@ interface TranslationCardProps {
   speakText: (text: string, language?: string) => Promise<void>;
 }
 
-const providerColors: Record<string, string> = {
-  google: '#4285f4',
-  deeplx: '#0f2b46',
-  baidu: '#2932e1',
-  openai: '#10a37f',
-};
-
 export default function TranslationCard({
   providerId,
   providerName,
+  providerProtocol,
+  providerEndpoint,
   status,
   text,
   languageCode,
@@ -49,8 +47,6 @@ export default function TranslationCard({
   const [isExpanded, setIsExpanded] = useState(true);
   const [isFavoritePending, setIsFavoritePending] = useState(false);
 
-  const providerColor =
-    providerColors[providerId.toLowerCase()] || 'rgb(var(--muted))';
   const isPending = status === 'pending';
   const isError = status === 'error';
   const displayText = text.trim();
@@ -67,10 +63,7 @@ export default function TranslationCard({
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
-          <div
-            className="h-5 w-1 shrink-0 rounded-full"
-            style={{ background: providerColor }}
-          />
+          <ProviderBrandIcon id={providerId} name={providerName} protocol={providerProtocol} endpoint={providerEndpoint} small />
           <span className="truncate text-card font-semibold text-ink">
             {providerName || providerId}
           </span>

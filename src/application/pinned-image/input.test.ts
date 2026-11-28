@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  getPinnedHoverToolbarActions,
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isCopyPinnedTextShortcut,
@@ -12,29 +11,6 @@ import {
 } from './input';
 
 describe('pinned image input mapping', () => {
-  it('describes the compact hover toolbar actions', () => {
-    expect(getPinnedHoverToolbarActions()).toEqual([
-      {
-        id: 'copy',
-        label: 'Copy',
-        title: 'Copy',
-        ariaLabel: 'Copy pinned image',
-      },
-      {
-        id: 'save',
-        label: 'Save',
-        title: 'Save',
-        ariaLabel: 'Save pinned image',
-      },
-      {
-        id: 'close',
-        label: 'X',
-        title: 'Close',
-        ariaLabel: 'Close pinned image',
-      },
-    ]);
-  });
-
   it('maps copy shortcuts without conflicting with source-text copy', () => {
     expect(
       isCopyPinnedImageShortcut({ key: 'c', metaKey: true, ctrlKey: false }),

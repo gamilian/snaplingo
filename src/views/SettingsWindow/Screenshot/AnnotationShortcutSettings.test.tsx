@@ -124,6 +124,18 @@ describe('editor shortcut settings', () => {
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
+  it('replaces a duplicate binding only after an explicit replacement action', () => {
+    const { input, onUpdate, container } = mount();
+    act(() => {
+      input('箭头').focus();
+      input('箭头').dispatchEvent(new KeyboardEvent('keydown', { key: 'o', code: 'KeyO', bubbles: true, cancelable: true }));
+    });
+    expect(onUpdate).not.toHaveBeenCalled();
+    const replace = [...container.querySelectorAll('button')].find((button) => button.textContent === '替换「椭圆」绑定');
+    act(() => replace?.click());
+    expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ arrow: 'o', ellipse: '' }));
+  });
+
   it('clears the scrolling shortcut and restores the defaults', () => {
     const { input, onUpdate, container } = mount();
     act(() => {

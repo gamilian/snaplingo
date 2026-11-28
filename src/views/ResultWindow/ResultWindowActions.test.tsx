@@ -21,6 +21,7 @@ const runtime = {
   swapTranslationLanguages: vi.fn(),
   updateOcrText: vi.fn(),
   clearOcrImage: vi.fn(),
+  applyPayload: vi.fn(async () => undefined),
   loadTranslationProviders: vi.fn(),
   resizeStandaloneWindow: vi.fn(),
   setAlwaysOnTop: vi.fn(),
@@ -112,6 +113,17 @@ describe('result window text actions', () => {
         expect.objectContaining({ provider_id: 'deeplx' }),
       ]),
     });
+    await view.unmount();
+  });
+
+  it('keeps OCR text editable and translates the current recognized text', async () => {
+    useResultWindowStore.setState({ resultWindowVisible: true, resultWindowMode: 'ocr', ocrText: 'edited recognition', ocrImageBase64: 'frozen-image' });
+    const view = await renderResultWindow();
+    const editor = view.container.querySelector<HTMLTextAreaElement>('[aria-label="识别结果"]');
+    expect(editor?.readOnly).toBe(false);
+    const translate = [...view.container.querySelectorAll('button')].find((button) => button.textContent === '一键翻译 →');
+    await act(async () => translate?.click());
+    expect(runtime.applyPayload).toHaveBeenCalledWith({ mode: 'translation', origin: 'ocr', text: 'edited recognition', autoTranslate: true });
     await view.unmount();
   });
 

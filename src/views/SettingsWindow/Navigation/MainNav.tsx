@@ -5,8 +5,7 @@ import { useFavoritesStore } from '../../../stores/favoritesStore';
 import { useScreenshotFavoritesStore } from '../../../stores/screenshotFavoritesStore';
 import {
   FavoritesIcon,
-  HistoryIcon,
-  OcrIcon,
+  OverviewIcon,
   ScreenshotIcon,
   ServicesIcon,
   SettingsIcon,
@@ -49,15 +48,14 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
     (state) => state.revision,
   );
   const settingsItems: NavItem[] = [
-    { key: 'general', label: t('general'), icon: <SettingsIcon /> },
-    { key: 'screenshot', label: t('screenshot'), icon: <ScreenshotIcon /> },
-    { key: 'translation', label: t('translation'), icon: <TranslationIcon /> },
-    { key: 'ocr', label: t('ocr'), icon: <OcrIcon /> },
-    { key: 'services', label: t('services'), icon: <ServicesIcon /> },
+    { key: 'overview', label: '概览与快捷键', icon: <OverviewIcon /> },
+    { key: 'screenshot', label: '截图与贴图', icon: <ScreenshotIcon /> },
+    { key: 'translation', label: '翻译与识别', icon: <TranslationIcon /> },
+    { key: 'services', label: '引擎与语音', icon: <ServicesIcon /> },
+    { key: 'general', label: '通用设置', icon: <SettingsIcon /> },
   ];
   const libraryItems: NavItem[] = [
-    { key: 'favorites', label: t('favorites'), icon: <FavoritesIcon /> },
-    { key: 'history', label: t('history'), icon: <HistoryIcon /> },
+    { key: 'history', label: '资料库', icon: <FavoritesIcon /> },
   ];
 
   useEffect(() => {
@@ -311,7 +309,7 @@ function NavGroup({
       )}
       <div className="settings-nav-items space-y-px">
         {items.map((item) => {
-          const active = activeTab === item.key;
+          const active = activeTab === item.key || (item.key === 'translation' && activeTab === 'ocr') || (item.key === 'history' && activeTab === 'favorites');
           return (
             <button
               key={item.key}

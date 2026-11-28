@@ -141,7 +141,7 @@ describe("capture presentation", () => {
     );
 
     expect(runtimeView).toContain(
-      "const TOOLBAR_SIZE = { width: 900, height: 40 };",
+      "const TOOLBAR_SIZE = { width: 680, height: 40 };",
     );
   });
 

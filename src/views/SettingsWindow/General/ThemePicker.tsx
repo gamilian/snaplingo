@@ -3,8 +3,8 @@ import type { InterfaceTheme } from '../../../application/settings/theme';
 
 const themes = [
   { id: 'native', name: '澄明', english: 'Native', description: '清透蓝调 · 经典侧栏' },
-  { id: 'studio', name: '夜航', english: 'Studio', description: '琥珀强调 · 紧凑工作台' },
-  { id: 'paper', name: '松间', english: 'Paper', description: '暖纸松绿 · 舒展阅读' },
+  { id: 'studio', name: '夜航', english: 'Studio', description: '琥珀强调 · 柔和暖灰' },
+  { id: 'paper', name: '松间', english: 'Paper', description: '暖纸松绿 · 舒适阅读' },
 ] as const;
 
 export function ThemePicker({

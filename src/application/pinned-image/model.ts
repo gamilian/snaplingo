@@ -1,3 +1,6 @@
+export const PINNED_DOCK_HEIGHT = 102;
+export const PINNED_WINDOW_MIN_WIDTH = 360;
+
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 8;
 const ZOOM_STEP = 0.1;

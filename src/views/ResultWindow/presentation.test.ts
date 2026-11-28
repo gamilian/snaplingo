@@ -386,10 +386,10 @@ describe('result window presentation', () => {
     );
   });
 
-  it('uses a compact vertical OCR result layout when a source image is available', () => {
-    expect(resultWindowOcrResultStackClassName()).toContain('flex-col');
+  it('uses side-by-side source and text cards when an OCR source image is available', () => {
+    expect(resultWindowOcrResultStackClassName()).toContain('ocr-result-grid');
     expect(resultWindowOcrResultStackClassName()).toContain('gap-3');
-    expect(resultWindowOcrResultStackClassName()).not.toContain('grid-cols-');
+    expect(resultWindowOcrResultStackClassName()).toContain('grid-cols-');
     expect(resultWindowOcrResultStackClassName()).not.toContain('gap-2.5');
 
     expect(resultWindowOcrImagePanelClassName()).toContain('rounded-xl');

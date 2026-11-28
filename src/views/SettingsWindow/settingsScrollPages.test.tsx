@@ -60,6 +60,10 @@ vi.mock('../../stores/settingsConfigStore', () => ({
   ) => selector(settingsConfig.state),
 }));
 
+vi.mock('../../stores/settingsStore', () => ({
+  useSettingsStore: (selector: (state: unknown) => unknown) => selector({ requestedSection: null, activeMainTab: 'translation', consumeRequestedSection: vi.fn() }),
+}));
+
 vi.mock('./runtimeContext', () => ({
   useSettingsRuntime: () => ({
     window: { selectScreenshotDirectory: vi.fn(async () => null) },
@@ -75,9 +79,9 @@ describe('single-scroll settings pages', () => {
     const sections = scrollSections(ScreenshotSettingsPage());
 
     expect(sections.map((section) => section.label)).toEqual([
-      '快捷键',
       '保存与输出',
-      '截图界面',
+      '选区外观与放大镜',
+      '桌面贴图设置',
     ]);
     const labels = settingRowLabels(sections);
     expect(labels).toContain('边框宽度');
@@ -91,7 +95,7 @@ describe('single-scroll settings pages', () => {
     expect(labels).not.toContain('记住上次使用的工具');
 
     const maskPresetButtons = findElements(
-      sections[2].content,
+      sections[1].content,
       (element) => element.props['aria-label']?.startsWith('遮罩颜色 ') ?? false,
     );
     expect(maskPresetButtons).toHaveLength(8);
@@ -101,28 +105,18 @@ describe('single-scroll settings pages', () => {
     const sections = scrollSections(TranslationSettingsScrollPage());
 
     expect(sections.map((section) => section.label)).toEqual([
-      '快捷键',
       '语言与取词',
       '窗口与输入框',
       '翻译行为',
+      'OCR 识别与文本处理',
     ]);
     const labels = settingRowLabels(sections);
     expect(labels).toContain('取词模式');
     expect(labels).toContain('最高屏幕占比');
     expect(labels).toContain('窗口宽度');
 
-    const hotkeys = findElements(
-      sections[0].content,
-      (element) => elementName(element) === 'FeatureHotkeysSection',
-    )[0];
-    expect(hotkeys.props.actions?.map((action) => action.key)).toEqual([
-      'selection-translate',
-      'screenshot-translate',
-      'show-window',
-    ]);
-
     const targetLanguageRow = findElements(
-      sections[1].content,
+      sections[0].content,
       (element) => element.props.label === '目标语言',
     )[0];
     const targetLanguageSelect = findElements(
@@ -139,9 +133,8 @@ describe('single-scroll settings pages', () => {
     const sections = scrollSections(OcrSettingsScrollPage());
 
     expect(sections.map((section) => section.label)).toEqual([
-      '快捷键',
-      '识别与文本',
-      '窗口与提示',
+      'OCR 识别与文本处理',
+      'OCR 窗口与提示',
     ]);
     const labels = settingRowLabels(sections);
     expect(labels).toContain('OCR 窗口位置');

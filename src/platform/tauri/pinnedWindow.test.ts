@@ -105,6 +105,18 @@ describe('Tauri pinned window adapter', () => {
     expect(setPosition.mock.calls).toEqual([[{ x: 90, y: 210 }], [{ x: -70, y: 120 }]]);
   });
 
+  it('keeps the image center fixed when adding a dock and zooming on a high-DPI display', async () => {
+    scaleFactor.mockResolvedValue(2);
+    outerSize.mockResolvedValueOnce({ width: 600, height: 400 }).mockResolvedValue({ width: 720, height: 604 });
+    outerPosition.mockResolvedValueOnce({ x: 100, y: 200 }).mockResolvedValue({ x: 40, y: 200 });
+    await pinnedWindow.resize(360, 302, 102);
+    expect(setSize).toHaveBeenLastCalledWith({ width: 360, height: 302 });
+    expect(setPosition).toHaveBeenLastCalledWith({ x: 40, y: 200 });
+    await pinnedWindow.resize(600, 502, 102);
+    expect(setPosition).toHaveBeenLastCalledWith({ x: -200, y: 0 });
+    await pinnedWindow.resize(600, 400);
+  });
+
   it('starts dragging the current pinned window', async () => {
     await pinnedWindow.startDragging();
 

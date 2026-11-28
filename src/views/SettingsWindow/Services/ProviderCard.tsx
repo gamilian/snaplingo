@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { Provider } from '../../../stores/providerStore';
 import IconActionButton from '../../../components/common/IconActionButton';
+import { ProviderBrandIcon } from '../../../components/common/ProviderBrandIcon';
 
 interface ProviderCardProps {
   provider: Provider;
@@ -25,7 +26,7 @@ export function ProviderCard({
   highlighted = false,
 }: ProviderCardProps) {
   const isActive = provider.status === 'active';
-  const canToggle = provider.status !== 'unconfigured' && Boolean(onActivate || onDeactivate);
+  const canToggle = provider.status !== 'unconfigured' && Boolean(isActive ? onDeactivate : onActivate);
   const subtitle = providerSubtitle(provider);
 
   const handleToggle = () => {
@@ -41,20 +42,14 @@ export function ProviderCard({
     <div
       className={`provider-card group/provider relative min-h-[72px] px-5 py-3.5 transition-colors duration-150 ${
         highlighted
-          ? 'bg-accent-soft/60 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-accent'
+          ? 'bg-accent-soft/60'
           : 'hover:bg-sunken'
       }`}
     >
       <div className="flex h-full items-center gap-4">
-        <div className="flex w-5 flex-shrink-0 justify-center text-faint">
-          {leadingSlot ?? <DragDots className="opacity-70" />}
-        </div>
+        {leadingSlot && <div className="flex w-5 flex-shrink-0 justify-center text-faint">{leadingSlot}</div>}
 
-        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${providerIconClass(provider.id)}`}>
-          <span className="text-xs font-semibold">
-            {providerInitial(provider.name)}
-          </span>
-        </div>
+        <ProviderBrandIcon {...provider} />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -79,21 +74,12 @@ export function ProviderCard({
           </p>
         </div>
 
-        <div className="flex flex-shrink-0 items-center justify-end gap-2 opacity-0 transition-opacity duration-150 group-hover/provider:opacity-100 group-focus-within/provider:opacity-100">
+        <div className="flex flex-shrink-0 items-center justify-end gap-1.5">
           {canToggle ? (
-            <button
-              type="button"
-              onClick={handleToggle}
-              className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-raised text-muted hover:bg-raised'
-                  : 'bg-accent text-accent-on hover:bg-accent-hover'
-              }`}
-            >
-              <PlayIcon className="h-4 w-4" />
-              {isActive ? '停用' : '启用'}
+            <button type="button" role="switch" aria-label={`启用 ${provider.name}`} aria-checked={isActive} onClick={handleToggle} className={`relative h-[21px] w-9 shrink-0 rounded-full transition-colors ${isActive ? 'bg-accent' : 'bg-line-strong'}`}>
+              <span className={`absolute left-[2.5px] top-[2.5px] h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isActive ? 'translate-x-[15px]' : ''}`} />
             </button>
-          ) : null}
+          ) : isActive ? <span className="rounded-full bg-accent-soft px-2 py-1 text-hint text-accent">已激活</span> : null}
 
           {onConfigure ? (
             <IconActionButton
@@ -128,24 +114,6 @@ export function ProviderCard({
       </div>
     </div>
   );
-}
-
-function DragDots({ className = '' }: { className?: string }) {
-  return (
-    <span className={`grid grid-cols-2 gap-0.5 ${className}`}>
-      {Array.from({ length: 6 }).map((_, index) => (
-        <span key={index} className="h-1 w-1 rounded-full bg-current" />
-      ))}
-    </span>
-  );
-}
-
-function providerInitial(name: string) {
-  const trimmed = name.trim();
-  if (!trimmed) return '?';
-  return trimmed.length > 1 && /^[a-z]+$/i.test(trimmed.slice(0, 2))
-    ? trimmed.slice(0, 2).toUpperCase()
-    : trimmed.charAt(0).toUpperCase();
 }
 
 function providerSubtitle(provider: Provider) {
@@ -195,26 +163,6 @@ function protocolLabel(protocol: string) {
   }
 }
 
-function providerIconClass(providerId: string) {
-  switch (providerId) {
-    case 'google-translate':
-      return 'border border-blue-100 bg-blue-50 text-blue-500';
-    case 'deeplx':
-      return 'border border-line bg-sunken text-muted';
-    case 'baidu-translate':
-    case 'baidu-ocr':
-      return 'border border-indigo-100 bg-indigo-50 text-indigo-500';
-    case 'system-ocr':
-      return 'border border-emerald-100 bg-emerald-50 text-emerald-600';
-    case 'tesseract':
-      return 'border border-line bg-sunken text-muted';
-    case 'system-tts':
-      return 'border border-orange-100 bg-orange-50 text-orange-600';
-    default:
-      return 'border border-line bg-sunken text-muted';
-  }
-}
-
 function EditIcon() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -227,14 +175,6 @@ function PulseIcon() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h3.5l2-5 4 10 2.5-5H21" />
-    </svg>
-  );
-}
-
-function PlayIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 5.75v12.5L18 12 8 5.75Z" />
     </svg>
   );
 }

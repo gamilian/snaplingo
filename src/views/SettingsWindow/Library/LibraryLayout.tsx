@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useSettingsStore } from '../../../stores/settingsStore';
 
 export type LibraryFilter<Key extends string> = {
   key: Key;
@@ -36,6 +37,8 @@ export function LibraryLayout<Key extends string>({
   onPageChange: (page: number) => void;
   footerAction?: ReactNode;
 }) {
+  const setActiveMainTab = useSettingsStore((state) => state.setActiveMainTab);
+  const isFavorites = title === '收藏夹';
   const start = total === 0 ? 0 : page * pageSize + 1;
   const end = Math.min(total, (page + 1) * pageSize);
   const hasPrevious = page > 0;
@@ -43,6 +46,11 @@ export function LibraryLayout<Key extends string>({
 
   return (
     <div className="library-layout grid h-full min-h-0 min-w-0 flex-1 grid-cols-[410px_minmax(0,1fr)] bg-surface">
+      <header className="library-page-header">
+        <div><h1>资料库</h1><p className="mt-1 text-xs text-muted">历史记录与个人收藏统一检索</p></div>
+        <div className="library-mode" aria-label="资料库范围"><button type="button" aria-pressed={!isFavorites} onClick={() => setActiveMainTab('history')}>历史记录</button><button type="button" aria-pressed={isFavorites} onClick={() => setActiveMainTab('favorites')}>★ 收藏夹</button></div>
+      </header>
+      <div className="library-columns">
       <section className="flex min-h-0 min-w-0 flex-col border-r border-line bg-sunken/60">
         <header className="library-heading space-y-3 border-b border-line bg-surface px-4 pb-3 pt-5">
           <div className="flex items-end justify-between gap-3">
@@ -118,6 +126,7 @@ export function LibraryLayout<Key extends string>({
       <section className="library-detail min-h-0 min-w-0 overflow-y-auto bg-canvas px-7 py-7">
         {detail}
       </section>
+      </div>
     </div>
   );
 }

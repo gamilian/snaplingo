@@ -48,6 +48,7 @@ export function createInitialResultWindowState(): ResultWindowState {
 
 export interface ResultWindowProjection extends ResultWindowState {
   readonly translationProviders: Provider[];
+  readonly ocrProvider?: Provider | null;
   readonly translationSettings: TranslationSettings | null;
   readonly ocrSettings: OcrSettings | null;
 }

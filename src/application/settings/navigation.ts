@@ -1,4 +1,5 @@
 export const SETTINGS_NAVIGATION_TABS = [
+  'overview',
   'general',
   'screenshot',
   'translation',

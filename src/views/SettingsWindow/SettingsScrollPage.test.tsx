@@ -53,6 +53,8 @@ describe('SettingsScrollPage navigation requests', () => {
       block: 'start',
     });
     expect(onHandled).toHaveBeenCalledOnce();
+    expect(container.querySelector('nav')).toBeNull();
+    expect(container.querySelectorAll('[data-settings-section]')).toHaveLength(2);
     const sectionCard = container.querySelector('main > div > section');
     expect(sectionCard?.className).toContain('overflow-visible');
     expect(sectionCard?.className).not.toContain('overflow-hidden');

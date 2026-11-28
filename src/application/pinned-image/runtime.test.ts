@@ -108,7 +108,9 @@ describe('pinned image application runtime', () => {
     });
 
     expect(commands.getPinnedImage).toHaveBeenCalledWith('pin-1');
-    expect(window.resize).toHaveBeenCalledWith(200, 300);
+    expect(window.resize).toHaveBeenCalledWith(360, 402, 102);
+    await runtime.copyImage();
+    expect(commands.copyPinnedImage).toHaveBeenCalledWith('pin-1', { width: 300, height: 200 });
   });
 
   it('owns default and configured-directory save workflows', async () => {
@@ -154,7 +156,7 @@ describe('pinned image application runtime', () => {
     const image = await runtime.replaceFromClipboard();
 
     expect(image.image_base64).toBe('replacement');
-    expect(window.resize).toHaveBeenCalledWith(900, 600);
+    expect(window.resize).toHaveBeenCalledWith(900, 702, 102);
     expect(calls).toEqual(['replace', 'resize']);
   });
 
@@ -173,7 +175,7 @@ describe('pinned image application runtime', () => {
       thumbnailMode: false,
     });
 
-    expect(window.resize).toHaveBeenLastCalledWith(600, 900);
+    expect(window.resize).toHaveBeenLastCalledWith(600, 1002, 102);
     expect(consoleError).toHaveBeenCalledTimes(2);
     consoleError.mockRestore();
   });
@@ -216,7 +218,7 @@ describe('pinned image application runtime', () => {
       transform: { rotation: 90, flipX: false, flipY: false },
       thumbnailMode: false,
     });
-    expect(window.resize).toHaveBeenLastCalledWith(600, 900);
+    expect(window.resize).toHaveBeenLastCalledWith(600, 1002, 102);
   });
 
   it('removes state before closing the native window', async () => {

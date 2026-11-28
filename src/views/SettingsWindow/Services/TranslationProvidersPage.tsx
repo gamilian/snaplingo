@@ -4,7 +4,7 @@ import { ProviderCard } from './ProviderCard';
 import { ProviderConfigDialog } from './ProviderConfigDialog';
 import { CustomTranslationProviderDialog } from './CustomTranslationProviderDialog';
 
-export function TranslationProvidersPage() {
+export function TranslationProvidersPage({ addRequest = 0, showAddAction = true }: { addRequest?: number; showAddAction?: boolean } = {}) {
   const providers = useProviderStore((state) => state.translationProviders);
   const activeProviders = useProviderStore((state) => state.activeTranslationProviders);
   const loadProviders = useProviderStore((state) => state.loadTranslationProviders);
@@ -20,6 +20,9 @@ export function TranslationProvidersPage() {
 
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
   const [addingCustomProvider, setAddingCustomProvider] = useState(false);
+  useEffect(() => {
+    if (addRequest > 0) { setConfiguringProvider(null); setAddingCustomProvider(true); }
+  }, [addRequest]);
   const [drag, setDrag] = useState<{ id: string; pointerId: number } | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
@@ -195,7 +198,7 @@ export function TranslationProvidersPage() {
 
   return (
     <div className="max-w-5xl">
-      <div className="-mx-[22px] divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
+      <div className="divide-y divide-line overflow-hidden bg-surface">
         {orderedProviders.map((provider) => {
           const isActive = activeProviders.includes(provider.id);
 
@@ -243,7 +246,7 @@ export function TranslationProvidersPage() {
         })}
       </div>
 
-      <button
+      {showAddAction && <button
         type="button"
         title="添加自定义服务"
         aria-label="添加自定义服务"
@@ -252,7 +255,7 @@ export function TranslationProvidersPage() {
       >
         <PlusIcon />
         <span>添加自定义服务</span>
-      </button>
+      </button>}
     </div>
   );
 }

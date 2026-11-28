@@ -33,6 +33,7 @@ export function useResultWindowProjection(): ResultWindowProjection {
     (state) => state.translation,
   );
   const ocrSettings = useSettingsConfigStore((state) => state.ocr);
+  const ocrProvider = useProviderStore((state) => state.ocrProviders.find((provider) => provider.id === state.activeOcrProvider) ?? null);
 
   return {
     sourceText: resultWindow.sourceText,
@@ -50,6 +51,7 @@ export function useResultWindowProjection(): ResultWindowProjection {
     resultWindowMode: resultWindow.resultWindowMode,
     resultWindowOrigin: resultWindow.resultWindowOrigin,
     translationProviders,
+    ocrProvider,
     translationSettings,
     ocrSettings,
   };

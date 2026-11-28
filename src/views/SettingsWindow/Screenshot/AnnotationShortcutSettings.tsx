@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnnotationToolIcon } from '../../../components/common/AnnotationToolIcon';
 import { normalizePinBorderShortcut } from '../../../application/pinned-image/borderShortcut';
 import { useNativeShortcutRecording } from './useNativeShortcutRecording';
 import {
@@ -31,13 +32,18 @@ export function AnnotationShortcutSettings({
 }) {
   const [recording, setRecording] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [replacement, setReplacement] = useState<{ next: Record<string, string>; tool: string; conflict: string } | null>(null);
   const shortcuts: Record<string, string> = {
     ...DEFAULT_ANNOTATION_SHORTCUTS,
     ...value,
   };
   const save = (next: Record<string, string>, editedTool?: string) => {
+    setReplacement(null);
     const conflict = annotationShortcutConflict(next);
     if (conflict) {
+      if (conflict.kind === 'duplicate' && editedTool) {
+        setReplacement({ next, tool: editedTool, conflict: conflict.tool === editedTool ? conflict.conflict : conflict.tool });
+      }
       setError(
         conflict.kind === 'duplicate'
           ? `与“${LABELS[conflict.conflict === editedTool ? conflict.tool : conflict.conflict]}”快捷键重复。`
@@ -58,62 +64,41 @@ export function AnnotationShortcutSettings({
     setError('该键已被全局快捷键占用，请先修改对应的全局绑定。');
   }, setError);
   return (
-    <div className="px-6 py-4">
-      <p className="mb-4 text-xs text-muted">
-        标注快捷键仅在截图编辑器中生效。可设置字母、数字或功能键，Delete
-        可清除。F3 用于贴图；绑定已用作全局快捷键的按键前，请先修改全局绑定。
-      </p>
-      <div className="grid grid-cols-1 gap-x-10 gap-y-3 md:grid-cols-2">
+    <div className="editor-shortcut-settings">
+      <div className="flex items-center justify-between gap-3 px-4 pt-3">
+        <p className="text-hint text-muted">字母、数字或 F1–F24 · Delete 清除 · Esc 取消</p>
+        <button type="button" className="settings-action" onClick={() => save({ ...DEFAULT_ANNOTATION_SHORTCUTS })}>恢复标注快捷键默认值</button>
+      </div>
+      <div className="keytile-grid">
         {Object.entries(LABELS).map(([tool, label]) => (
-          <label
-            key={tool}
-            className="flex items-center justify-between gap-3 text-xs text-ink"
-          >
-            {label}
-            <input
-              className={`h-8 w-[112px] rounded border bg-surface px-3 text-center font-mono text-accent outline-none ${recording === tool ? 'border-accent' : 'border-line'}`}
-              value={
-                recording === tool ? '' : (shortcuts[tool] ?? '').toUpperCase()
-              }
-                  placeholder={recording === tool ? '按下按键' : '未设置'}
-              aria-label={`${label}快捷键`}
-              readOnly
-              onFocus={() => setRecording(tool)}
-              onBlur={() => setRecording(null)}
-              onKeyDown={(event) => {
-                if (event.key === 'Tab') return;
-                event.preventDefault();
-                if (event.key === 'Escape') {
-                  setRecording(null);
-                  return;
-                }
-                if (event.key === 'Delete' || event.key === 'Backspace') {
-                  save({ ...shortcuts, [tool]: '' }, tool);
-                  return;
-                }
-                if (event.ctrlKey || event.metaKey || event.altKey) {
-                  setError('工具切换仅使用主键，请松开修饰键。');
-                  return;
-                }
-                const key = normalizeEditorShortcutKey(event);
-                save({ ...shortcuts, [tool]: key }, tool);
-              }}
-            />
-          </label>
+          <div key={tool} className={`keytile ${recording === tool ? 'recording' : ''} ${replacement && (replacement.tool === tool || replacement.conflict === tool) ? 'conflict' : ''}`}>
+            <label className="keytile-label">
+              <span className="keytile-icon"><AnnotationToolIcon tool={tool} /></span>
+              <span className="keytile-name">{label}</span>
+              <input
+                className="keytile-cap"
+                value={recording === tool ? '' : (shortcuts[tool] ?? '').toUpperCase()}
+                placeholder={recording === tool ? '…' : '—'}
+                aria-label={`${label}快捷键`}
+                readOnly
+                onFocus={() => { setError(null); setRecording(tool); }}
+                onBlur={() => setRecording(null)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Tab') return;
+                  event.preventDefault();
+                  if (event.key === 'Escape') { setError(null); setReplacement(null); setRecording(null); return; }
+                  if (event.key === 'Delete' || event.key === 'Backspace') { save({ ...shortcuts, [tool]: '' }, tool); return; }
+                  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) { setError('工具切换仅使用主键，请松开修饰键。'); return; }
+                  save({ ...shortcuts, [tool]: normalizeEditorShortcutKey(event) }, tool);
+                }}
+              />
+            </label>
+            {shortcuts[tool] !== DEFAULT_ANNOTATION_SHORTCUTS[tool as keyof typeof DEFAULT_ANNOTATION_SHORTCUTS] && <button type="button" className="keytile-reset" aria-label={`恢复${label}默认快捷键`} onClick={() => save({ ...shortcuts, [tool]: DEFAULT_ANNOTATION_SHORTCUTS[tool as keyof typeof DEFAULT_ANNOTATION_SHORTCUTS] }, tool)}>↺</button>}
+          </div>
         ))}
       </div>
-      {error && (
-        <p role="alert" className="mt-3 text-xs text-bad">
-          {error}
-        </p>
-      )}
-      <button
-        type="button"
-        className="mt-4 h-8 rounded border border-line bg-surface px-3 text-xs text-muted hover:bg-raised"
-        onClick={() => save({ ...DEFAULT_ANNOTATION_SHORTCUTS })}
-      >
-        恢复标注快捷键默认值
-      </button>
+      {error && <div className="keytile-hint flex items-center justify-between gap-3" role="alert"><span>{error}</span>{replacement && <button type="button" className="settings-action" onClick={() => save({ ...replacement.next, [replacement.conflict]: '' }, replacement.tool)}>替换「{LABELS[replacement.conflict]}」绑定</button>}</div>}
+      <p className="keytile-hint">F3 用于贴图。已被全局快捷键占用的按键需先修改对应绑定；重复键位会提示冲突。</p>
     </div>
   );
 }
